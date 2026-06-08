@@ -5,6 +5,8 @@
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
+Idea came from the Xojo forum post https://forum.xojo.com/t/extracting-xls-excel-file-natively/88210/1
+
 A cross-platform `.xlsx` viewer written in **pure Xojo** (API 2.0, no plugins). Ships as a **Desktop** app for macOS / Windows / Linux and a **Web 2.0** browser app from the same shared parser.
 
 Open any Excel workbook → one tab per sheet → cell values rendered in a Listbox.
