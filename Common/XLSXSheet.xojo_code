@@ -12,6 +12,45 @@ Protected Class XLSXSheet
 		End Sub
 	#tag EndMethod
 
+	#tag Method, Flags = &h0
+		Sub Constructor(name As String, tabIndex As Integer)
+		  ' Empty sheet — no XLSX XML parsing. The caller populates it via PutCell
+		  ' and AddMergedRange. Used by ODSReader (and any non-XLSX source) to build
+		  ' the shared workbook model directly.
+		  Me.Name = name
+		  Me.TabIndex = tabIndex
+		  mCells = New Dictionary
+		  mMergeFollowers = New Dictionary
+		  mMergeRanges = New Dictionary
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 496E736572742061207072652D6275696C7420584C535843656C6C206174206120312D62617365642028726F772C20636F6C292C207570646174696E672074686520736865657420657874656E742E2055736564206279206E6F6E2D584C535820736F757263657320284F4453526561646572292E0A
+		Sub PutCell(row As Integer, col As Integer, cell As XLSXCell)
+		  ' Insert a pre-built cell at a 1-based (row, col). Updates the sheet extent.
+		  If row <= 0 Or col <= 0 Or cell Is Nil Then Return
+		  Var key As Integer = (row * 16384) + col
+		  mCells.Value(key) = cell
+		  If row > mMaxRow Then mMaxRow = row
+		  If col > mMaxCol Then mMaxCol = col
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 5265636F72642061206D65726765642072656374616E676C652028312D62617365642C20696E636C75736976652920616E6420666C616720657665727920636F76657265642063656C6C206578636570742074686520616E63686F722E0A
+		Sub AddMergedRange(firstRow As Integer, firstCol As Integer, lastRow As Integer, lastCol As Integer)
+		  ' Record a merged rectangle and flag every covered cell except the anchor.
+		  If firstRow <= 0 Or firstCol <= 0 Or lastRow < firstRow Or lastCol < firstCol Then Return
+		  Var range As New XLSXCellRange(firstRow, firstCol, lastRow, lastCol)
+		  mMergeRanges.Value(mMergeRanges.KeyCount) = range
+		  For r As Integer = firstRow To lastRow
+		    For c As Integer = firstCol To lastCol
+		      If r = firstRow And c = firstCol Then Continue
+		      mMergeFollowers.Value(r.ToString + "," + c.ToString) = True
+		    Next
+		  Next
+		End Sub
+	#tag EndMethod
+
 	#tag Method, Flags = &h0, Description = 4869676865737420726F77206E756D626572207769746820612073746F7265642063656C6C2E0A
 		Function RowCount() As Integer
 		  Return mMaxRow

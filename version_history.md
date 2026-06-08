@@ -4,6 +4,22 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 While `MAJOR=0`, breaking changes can occur on `MINOR` bumps.
 
+## [0.3.0] - 2026-06-08
+
+### Added
+
+- **Read `.ods` (OpenDocument Spreadsheet) files** in both the Desktop and Web apps, alongside `.xlsx`. A new format-agnostic front door (`SpreadsheetReader`) dispatches by extension.
+- New `ODSReader` parses an `.ods` `content.xml` into the **same** `XLSXWorkbook` / `XLSXSheet` / `XLSXCell` model the XLSX reader uses, so tabs, listbox rendering, the format engine, the Memory/Disk zip backend, and the per-phase parse timer all work unchanged.
+- ODS coverage: cell value types (string / float / percentage / currency / date / time / boolean), inline `<text:p>` text, formula cells (cached value), merged cells (`table:number-rows/columns-spanned` + `<table:covered-table-cell>`), and `number-columns/rows-repeated` compression.
+- Converts OpenDocument `<number:date-style>` / `<number:number-style>` / `<number:currency-style>` / `<number:percentage-style>` element trees into the format-code strings the engine already renders (currency symbols emitted as `[$SYM-0]` tags; ISO dates converted to Excel serials).
+- `.ods` files use the identical `XLSXZip` dual backend — the "Read in memory" checkbox and the `zip X + xml Y (Memory|Disk)` parse-time readout apply to ODS too.
+- Reused-infrastructure additions: `XLSXSheet` empty constructor + `PutCell` / `AddMergedRange`; `XLSXCell.FormatCode`; `XLSXFormatter.DateTimeToExcelSerial`.
+- ODS test fixtures: `ods-multi-sheet.ods`, `ods-types.ods`, `ods-sales.ods`, `ods-styled.ods`.
+
+### Compatibility
+
+- No breaking changes. `XLSXReader.Open` is unchanged; `SpreadsheetReader.Open` is the new recommended entry point, and `ODSReader.Open` is available to force ODS.
+
 ## [0.2.1] - 2026-05-11
 
 ### Added

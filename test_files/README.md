@@ -1,6 +1,8 @@
 # Test fixtures
 
-Public XLSX files used for manual verification of the parser. Each one targets a specific feature or edge case.
+Sample spreadsheets used for manual verification of the parser. Each one targets a specific feature or edge case.
+
+## XLSX
 
 | File | Source | Size | Sheets | Useful for |
 |------|--------|-----:|--------|------------|
@@ -11,4 +13,13 @@ Public XLSX files used for manual verification of the parser. Each one targets a
 | `excelize-calcchain.xlsx` | [qax-os/excelize](https://github.com/qax-os/excelize) test data | 6 KB | 1 | formula cells with cached values |
 | `excelize-mergecell.xlsx` | [qax-os/excelize](https://github.com/qax-os/excelize) test data | 6 KB | 1 | merged-cell rectangles |
 
-Each fixture is a public sample published by its upstream project. If a license question arises, delete and re-fetch from the URL above.
+## ODS (OpenDocument Spreadsheet)
+
+| File | Sheets | Useful for |
+|------|--------|------------|
+| `ods-multi-sheet.ods` | 2 (`Sheet1`, `Sheet2`) | basic multi-sheet smoke test |
+| `ods-types.ods` | 1 (`Types`) | every value type — string, float, int, date, time, date-time, boolean |
+| `ods-sales.ods` | 1 (`Sales`) | a wider numeric grid |
+| `ods-styled.ods` | 1 (`Styled`) | `<number:*-style>` → format codes: currency (parens for negative), grouped number, percentage, `dd/mm/yyyy` date, plus a 2-column merged cell |
+
+The XLSX fixtures are public samples published by their upstream projects. The ODS fixtures are generated/hand-crafted for this project (no third-party content); they include proper column-width styles so they render correctly in LibreOffice / OnlyOffice as well.

@@ -1,20 +1,21 @@
 # VNS XLSX Reader
 
 [![Xojo](https://img.shields.io/badge/Xojo-2026r1-blue)](https://www.xojo.com)
-[![Version](https://img.shields.io/badge/version-0.2.1-green)](version_history.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-green)](version_history.md)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-Idea came from the Xojo forum post https://forum.xojo.com/t/extracting-xls-excel-file-natively/88210/1
+> 💡 **Idea source:** this project grew out of the Xojo forum post [*Extracting xls/Excel file natively*](https://forum.xojo.com/t/extracting-xls-excel-file-natively/88210/1) — reading spreadsheet files with no plugins or third-party libraries.
 
-A cross-platform `.xlsx` viewer written in **pure Xojo** (API 2.0, no plugins). Ships as a **Desktop** app for macOS / Windows / Linux and a **Web 2.0** browser app from the same shared parser.
+A cross-platform `.xlsx` **and** `.ods` viewer written in **pure Xojo** (API 2.0, no plugins). Ships as a **Desktop** app for macOS / Windows / Linux and a **Web 2.0** browser app from the same shared parser.
 
-Open any Excel workbook → one tab per sheet → cell values rendered in a Listbox.
+Open any Excel or OpenDocument workbook → one tab per sheet → cell values rendered in a Listbox.
 
 ## Features
 
-- 📂 **Open `.xlsx` files** via a native file dialog (Desktop) or browser upload (Web).
-- 📑 **One tab per sheet**, picked from the workbook's `<sheets>` order.
+- 📂 **Open `.xlsx` and `.ods` files** via a native file dialog (Desktop) or browser upload (Web). One format-agnostic reader (`SpreadsheetReader`) picks the parser by extension.
+- 📗 **OpenDocument (`.ods`) support** — the ODS reader parses `content.xml` into the same workbook model, converting OpenDocument `<number:*-style>` trees (date / number / currency / percentage) into the format codes the engine already understands.
+- 📑 **One tab per sheet**, picked from the workbook's sheet order.
 - 🔢 **Resolves cell types**: shared strings, numbers, booleans, errors, inline strings, formulas (cached values).
 - 📅 **Excel format codes**: a pragmatic subset for numbers (`0`, `0.00`, `#,##0`, `#,##0.00`, `0%`, `0.00%`), **scientific** (`0.00E+00`), **accounting** (`_("$"* #,##0.00_)…` with parens for negatives), **currency tags** (`[$X-Y]`), and dates (`dd/mm/yyyy`, `yyyy-mm-dd`, `m/d/yy h:mm`, `hh:mm`, …); custom `numFmtId ≥ 164` from `styles.xml` honored.
 - 🔁 **Merged cells**: top-left anchor renders the value, follower cells stay blank.
@@ -31,11 +32,13 @@ The Desktop window above shows the "Read in memory" checkbox and the per-phase p
 
 ## Quick start
 
+`SpreadsheetReader.Open` is the format-agnostic entry point — it dispatches `.xlsx` → `XLSXReader` and `.ods` → `ODSReader` and returns the same `XLSXWorkbook` either way. (Call `XLSXReader.Open` / `ODSReader.Open` directly if you want to force a format.)
+
 ```xojo
-' Desktop
-Var f As FolderItem = ... ' from OpenFileDialog
+' Desktop — open .xlsx or .ods
+Var f As FolderItem = ... ' from OpenFileDialog (filter: xlsx;ods)
 Try
-  Var wb As XLSXWorkbook = XLSXReader.Open(f)
+  Var wb As XLSXWorkbook = SpreadsheetReader.Open(f)
   System.DebugLog "Sheets: " + Str(wb.SheetCount)
   For i As Integer = 1 To wb.SheetCount
     Var s As XLSXSheet = wb.SheetAt(i)
@@ -53,7 +56,8 @@ Sub FileAdded(filename As String, bytes As UInt64, mimeType As String)
 End Sub
 
 Sub UploadFinished(files() As WebUploadedFile)
-  Var wb As XLSXWorkbook = XLSXReader.Open(files(0).File)
+  ' pass the original filename so the dispatcher can pick xlsx vs ods
+  Var wb As XLSXWorkbook = SpreadsheetReader.Open(files(0).File, files(0).Name)
   ' bind sheets to a WebTabPanel + WebListBox
 End Sub
 ```
@@ -65,7 +69,9 @@ Full API reference: [`developper_doc.md`](developper_doc.md).
 ```
 VNS-XLSX-Reader/
 ├── Common/                          ← shared parser (UI-free)
-│   ├── XLSXReader.xojo_code         ← public entry point
+│   ├── SpreadsheetReader.xojo_code  ← format-agnostic front door (.xlsx / .ods)
+│   ├── XLSXReader.xojo_code         ← .xlsx entry point
+│   ├── ODSReader.xojo_code          ← .ods entry point (same workbook model)
 │   ├── XLSXWorkbook.xojo_code       ← workbook aggregate
 │   ├── XLSXSheet.xojo_code          ← sheet model + parser
 │   ├── XLSXCell.xojo_code           ← cell + lazy DisplayText
@@ -80,7 +86,7 @@ VNS-XLSX-Reader/
 │   └── strings.xojo_code            ← localizable kStr… constants
 ├── VNS-Desktop-XLSX_Reader/         ← Desktop app (DesktopTabPanel + DesktopListBox)
 ├── VNS-Web-XLSX-Reader/             ← Web 2.0 app (WebFileUploader + WebTabPanel + WebListBox)
-├── test_files/                      ← public XLSX samples for testing
+├── test_files/                      ← .xlsx and .ods samples for testing
 ├── developper_doc.md                ← developer API reference
 ├── version_history.md               ← per-release changelog
 ├── README.md
@@ -125,11 +131,9 @@ See [`developper_doc.md`](developper_doc.md) for the full feature matrix and how
 
 ## Test fixtures
 
-[`test_files/`](test_files/) ships four small public XLSX samples (sourced from the test data of popular open-source XLSX libraries) covering:
-- multi-sheet smoke testing,
-- shared-strings table resolution,
-- formulas with cached values,
-- a small typical workbook.
+[`test_files/`](test_files/) ships small `.xlsx` samples (from the test data of popular open-source XLSX libraries) plus generated `.ods` fixtures, covering:
+- multi-sheet smoke testing, shared-strings resolution, formulas with cached values;
+- ODS value types (string / number / date / time / boolean) and `<number:*-style>` → format-code conversion (currency, number, percentage, date) with a merged cell.
 
 See [`test_files/README.md`](test_files/README.md) for the per-fixture mapping.
 

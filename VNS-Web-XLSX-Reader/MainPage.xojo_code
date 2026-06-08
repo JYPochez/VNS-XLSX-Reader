@@ -35,7 +35,7 @@ Begin WebPage MainPage
    _mName          =   ""
    _mPanelIndex    =   -1
    Begin WebFileUploader UploaderXLSX
-      AllowedFileTypes=   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
+      AllowedFileTypes=   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx,application/vnd.oasis.opendocument.spreadsheet,.ods"
       Caption         =   "Select"
       ControlID       =   ""
       CSSClasses      =   ""
@@ -247,7 +247,7 @@ End
 		    mode = XLSXEnums.eOpenMode.Disk
 		  End If
 		  Try
-		    Var wb As XLSXWorkbook = XLSXReader.Open(file.File, mode)
+		    Var wb As XLSXWorkbook = SpreadsheetReader.Open(file.File, file.Name, mode)
 		    mWorkbook = wb
 		    Var zipMs As Integer = Floor(wb.ZipMicroseconds / 1000.0)
 		    Var xmlMs As Integer = Floor(wb.XmlMicroseconds / 1000.0)

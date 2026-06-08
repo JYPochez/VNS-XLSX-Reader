@@ -107,9 +107,12 @@ All shared parser code lives in `Common/`. Per-project UI fillers live in their 
 
 | Symbol | Kind | Brief |
 |---|---|---|
-| `XLSXReader.Open(file As FolderItem)` | Module function | Top-level entry; returns `XLSXWorkbook`; raises `XLSXException` on failure |
-| `XLSXReader.Open(data As MemoryBlock, sourceName As String)` | Module function | Same, for in-memory input |
-| `XLSXWorkbook` | Class | Owns sheets, shared strings, styles |
+| `SpreadsheetReader.Open(file [, nameHint] [, mode])` | Module function | **Format-agnostic front door.** Dispatches `.ods` → `ODSReader`, else → `XLSXReader`. The UI calls this. |
+| `XLSXReader.Open(file As FolderItem [, mode])` | Module function | XLSX entry; returns `XLSXWorkbook`; raises `XLSXException` on failure |
+| `XLSXReader.Open(data As MemoryBlock, sourceName As String [, mode])` | Module function | Same, for in-memory input |
+| `ODSReader.Open(file As FolderItem [, mode])` | Module function | OpenDocument (.ods) entry; returns the same `XLSXWorkbook` model |
+| `ODSReader.Open(data As MemoryBlock, sourceName As String [, mode])` | Module function | Same, for in-memory input |
+| `XLSXWorkbook` | Class | Owns sheets, shared strings, styles. The shared model for both formats. |
 | `XLSXSheet` | Class | One sheet's cells + merged ranges |
 | `XLSXCell` | Class | One cell + lazy `DisplayText(styles)` |
 | `XLSXCellRange` | Class | Inclusive 1-based row/col range |

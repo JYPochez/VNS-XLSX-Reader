@@ -213,8 +213,8 @@ End
 		Private Sub ShowOpenDialog()
 		  Var dlg As New OpenFileDialog
 		  Var t As New FileType
-		  t.Name = "Excel Workbook"
-		  t.Extensions = "xlsx"
+		  t.Name = "Spreadsheet"
+		  t.Extensions = "xlsx;ods"
 		  dlg.Filter = t
 		  Var f As FolderItem = dlg.ShowModal(Self)
 		  If f = Nil Then Return
@@ -241,7 +241,7 @@ End
 		    mode = XLSXEnums.eOpenMode.Disk
 		  End If
 		  Try
-		    Var wb As XLSXWorkbook = XLSXReader.Open(file, mode)
+		    Var wb As XLSXWorkbook = SpreadsheetReader.Open(file, mode)
 		    mWorkbook = wb
 		    Var zipMs As Integer = Floor(wb.ZipMicroseconds / 1000.0)
 		    Var xmlMs As Integer = Floor(wb.XmlMicroseconds / 1000.0)
