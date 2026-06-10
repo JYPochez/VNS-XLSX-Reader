@@ -15,6 +15,9 @@ Open any Excel or OpenDocument workbook → one tab per sheet → cell values re
 
 - 📂 **Open `.xlsx` and `.ods` files** via a native file dialog (Desktop) or browser upload (Web). One format-agnostic reader (`SpreadsheetReader`) picks the parser by extension.
 - 📗 **OpenDocument (`.ods`) support** — the ODS reader parses `content.xml` into the same workbook model, converting OpenDocument `<number:*-style>` trees (date / number / currency / percentage) into the format codes the engine already understands.
+- ✏️ **Edit cells in place** — click a cell to edit it; numeric input keeps the cell's type and number format (dates and currency re-render formatted), text becomes a string cell.
+- 🆕 **Create a sheet from scratch** — the **New** button opens an empty editable grid, and **+ Row / − Row / + Col / − Col** buttons grow or shrink the sheet (they work on opened files too). Save it as `.xlsx` or `.ods` like any workbook.
+- 💾 **Save / export to `.xlsx` AND `.ods`** — from either app, in either format (full cross-format conversion). Desktop uses the native save dialog (on macOS the two file types appear as a real *Format* popup); Web offers a format picker + browser download. Powered by a pure-Xojo in-memory zip writer (`MemoryBlock.Compress` + own CRC-32; ODS `mimetype` first and stored, per spec).
 - 📑 **One tab per sheet**, picked from the workbook's sheet order.
 - 🔢 **Resolves cell types**: shared strings, numbers, booleans, errors, inline strings, formulas (cached values).
 - 📅 **Excel format codes**: a pragmatic subset for numbers (`0`, `0.00`, `#,##0`, `#,##0.00`, `0%`, `0.00%`), **scientific** (`0.00E+00`), **accounting** (`_("$"* #,##0.00_)…` with parens for negatives), **currency tags** (`[$X-Y]`), and dates (`dd/mm/yyyy`, `yyyy-mm-dd`, `m/d/yy h:mm`, `hh:mm`, …); custom `numFmtId ≥ 164` from `styles.xml` honored.
@@ -24,11 +27,23 @@ Open any Excel or OpenDocument workbook → one tab per sheet → cell values re
 - ⚠️ **Typed errors** (`XLSXException` with an `eParseError` code) so UI code can show friendly messages.
 - 🔌 **Zero external dependencies** — uses only Xojo framework classes (`FolderItem.Unzip`, `XmlDocument`, `DateTime`).
 
-## Screenshot
+## Screenshots
 
-![VNS XLSX Reader desktop — Microsoft Financial Sample workbook open with the per-phase parse-time readout](screenshot.png)
+![VNS XLSX Reader desktop — Microsoft Financial Sample workbook open, with the per-phase parse-time readout and the New / Save / row-column buttons](screenshot.png)
 
-The Desktop window above shows the "Read in memory" checkbox and the per-phase parse-time label (`Parsed in 220 ms (zip 4 + xml 216, Memory)`). Web has the same controls.
+The Desktop window: **Open… / New / Save…** buttons, "Read in memory" checkbox, per-phase parse-time label (`Parsed in 241 ms (zip 1 + xml 240, Memory)`), and the **+ Row / − Row / + Col / − Col** structure buttons. Web has the same controls.
+
+![Editing a cell in place — the clicked cell turns into a text field](screenshot-edit-cell.png)
+
+**In-place editing**: click any cell to edit it; the committed value is written back into the workbook model and re-rendered through the format engine.
+
+![A brand-new empty sheet — editable grid with column-letter headers](screenshot-new-sheet.png)
+
+**Creating a sheet from scratch**: **New** opens an empty editable grid (column letters as headers); grow it with the row/column buttons, fill cells, then save as `.xlsx` or `.ods`.
+
+![The macOS save dialog with the Format popup offering Excel Workbook and OpenDocument Spreadsheet](screenshot-save-format.png)
+
+**Saving**: the save dialog offers both formats — on macOS the two file types surface as a native *Format* popup, so an opened `.xlsx` can be saved as `.ods` and vice versa.
 
 ## Quick start
 
@@ -68,18 +83,22 @@ Full API reference: [`developper_doc.md`](developper_doc.md).
 
 ```
 VNS-XLSX-Reader/
-├── Common/                          ← shared parser (UI-free)
-│   ├── SpreadsheetReader.xojo_code  ← format-agnostic front door (.xlsx / .ods)
-│   ├── XLSXReader.xojo_code         ← .xlsx entry point
-│   ├── ODSReader.xojo_code          ← .ods entry point (same workbook model)
+├── Common/                          ← shared parser + writers (UI-free)
+│   ├── SpreadsheetReader.xojo_code  ← format-agnostic OPEN front door (.xlsx / .ods)
+│   ├── XLSXReader.xojo_code         ← .xlsx reader
+│   ├── ODSReader.xojo_code          ← .ods reader (same workbook model)
+│   ├── SpreadsheetWriter.xojo_code  ← format-agnostic SAVE front door (.xlsx / .ods)
+│   ├── XLSXWriter.xojo_code         ← .xlsx serializer (OPC parts, numFmts, mergeCells)
+│   ├── ODSWriter.xojo_code          ← .ods serializer (content.xml + number styles)
+│   ├── SpreadsheetZipWriter.xojo_code ← in-memory zip builder (deflate + CRC-32)
 │   ├── XLSXWorkbook.xojo_code       ← workbook aggregate
-│   ├── XLSXSheet.xojo_code          ← sheet model + parser
+│   ├── XLSXSheet.xojo_code          ← sheet model + parser + row/col operations
 │   ├── XLSXCell.xojo_code           ← cell + lazy DisplayText
 │   ├── XLSXStyles.xojo_code         ← styles.xml parser
 │   ├── XLSXFormatter.xojo_code      ← number/date format codes
-│   ├── XLSXZip.xojo_code            ← framework FolderItem.Unzip wrapper
-│   ├── XLSXEnums.xojo_code          ← eCellType / eParseError
-│   ├── XLSXHelpers.xojo_code        ← Extends-based ToString helpers
+│   ├── XLSXZip.xojo_code            ← zip reading (Memory / Disk backends)
+│   ├── XLSXEnums.xojo_code          ← eCellType / eParseError / eOpenMode
+│   ├── XLSXHelpers.xojo_code        ← enum ToString helpers, XmlEscape, NewWorkbook…
 │   ├── XLSXException.xojo_code      ← typed exception
 │   ├── XLSXCellRange.xojo_code      ← merged-range value type
 │   ├── XLSXCellRef.xojo_code        ← A1 ↔ row/col helpers
@@ -114,12 +133,11 @@ The two `.xojo_project` files reference every `Common/*.xojo_code` via `Module=`
 
 > ⚠️ **Don't open both projects in Xojo at the same time** — Xojo's text-format files cannot be safely co-edited from two IDE instances; saving one would clobber the shared `Common/` files. Open them serially.
 
-## Limitations (V1 / 0.1.0)
+## Limitations
 
 | Out of scope | Workaround / status |
 |---|---|
-| Writing / saving an XLSX | Read-only |
-| Formula evaluation | Cached values are shown as-is |
+| Formula evaluation | Cached values are shown as-is; saving writes the cached value (formula text is not kept) |
 | Cell colors / fonts / borders | Values only — no styling fidelity |
 | Images, charts, pivots | Ignored |
 | Conditional formatting | Ignored |

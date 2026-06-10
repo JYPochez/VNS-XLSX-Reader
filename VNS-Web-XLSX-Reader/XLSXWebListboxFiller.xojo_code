@@ -1,22 +1,34 @@
 #tag Module
 Protected Module XLSXWebListboxFiller
-	#tag Method, Flags = &h0, Description = 46696C6C2061205765624C697374426F7820776974682074686520636F6E74656E7473206F6620616E20584C535853686565742E204669727374206E6F6E2D656D70747920726F77206265636F6D657320746865206865616465723B206D65726765642D63656C6C20666F6C6C6F776572732072656E64657220626C616E6B2E0A
-		Sub Fill(lb As WebListBox, sheet As XLSXSheet, styles As XLSXStyles)
+	#tag Method, Flags = &h0, Description = 46696C6C2061205765624C697374426F782066726F6D20616E20584C535853686565742E2056696577696E67206D6F6465202864656661756C74293A206669727374206E6F6E2D656D70747920726F77206265636F6D657320746865206865616465722C20656D70747920726F777320736B69707065642E2047726964206D6F6465202873686F77416C6C43656C6C73293A20636F6C756D6E206C65747465727320617320686561646572732C20657665727920726F772073686F776E202D20666F722065646974696E672F6275696C64696E67207368656574732E0A
+		Sub Fill(lb As WebListBox, sheet As XLSXSheet, styles As XLSXStyles, showAllCells As Boolean = False)
 		  lb.RemoveAllRows
 		  Var cols As Integer = Max(1, sheet.ColCount)
 		  lb.ColumnCount = cols
 
-		  Var headerRow As Integer = FindFirstNonEmptyRow(sheet)
-		  If headerRow = 0 Then Return
+		  ' Two display modes:
+		  '  - viewing (default): first non-empty row becomes the header, rows
+		  '    where every cell renders empty are skipped.
+		  '  - grid (showAllCells): column letters as headers, every row shown —
+		  '    used when editing / building a sheet from scratch.
+		  Var firstDataRow As Integer
+		  If showAllCells Then
+		    For c As Integer = 1 To cols
+		      lb.HeaderAt(c - 1) = XLSXCellRef.IndexToColLetters(c)
+		    Next
+		    firstDataRow = 1
+		  Else
+		    Var headerRow As Integer = FindFirstNonEmptyRow(sheet)
+		    If headerRow = 0 Then Return
+		    For c As Integer = 1 To cols
+		      lb.HeaderAt(c - 1) = sheet.CellAt(headerRow, c).DisplayText(styles)
+		    Next
+		    firstDataRow = headerRow + 1
+		  End If
 
-		  ' First non-empty row -> header.
-		  For c As Integer = 1 To cols
-		    lb.HeaderAt(c - 1) = sheet.CellAt(headerRow, c).DisplayText(styles)
-		  Next
-
-		  ' Body rows. Build texts first so we can skip rows where every cell
-		  ' is empty (Excel often leaves styled-but-empty rows that inflate RowCount).
-		  For r As Integer = headerRow + 1 To sheet.RowCount
+		  ' Body rows. Build texts first so viewing mode can skip rows where every
+		  ' cell is empty (Excel often leaves styled-but-empty rows inflating RowCount).
+		  For r As Integer = firstDataRow To sheet.RowCount
 		    Var rowTexts() As String
 		    Var anyNonEmpty As Boolean = False
 		    For c As Integer = 1 To cols
@@ -29,9 +41,12 @@ Protected Module XLSXWebListboxFiller
 		      rowTexts.Add text
 		      If text <> "" Then anyNonEmpty = True
 		    Next
-		    If Not anyNonEmpty Then Continue
+		    If Not showAllCells And Not anyNonEmpty Then Continue
 		    lb.AddRow("")
 		    Var lbRow As Integer = lb.RowCount - 1
+		    ' Remember which sheet row this listbox row shows (empty rows are
+		    ' skipped, so indexes differ); used to write cell edits back.
+		    lb.CellTagAt(lbRow, 0) = r
 		    For c As Integer = 0 To cols - 1
 		      lb.CellTextAt(lbRow, c) = rowTexts(c)
 		    Next

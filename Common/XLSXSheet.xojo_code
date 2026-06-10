@@ -51,6 +51,45 @@ Protected Class XLSXSheet
 		End Sub
 	#tag EndMethod
 
+	#tag Method, Flags = &h0, Description = 47726F772074686520736865657420657874656E74206279206F6E6520656D70747920726F772061742074686520626F74746F6D20286E6F2063656C6C732073746F726564292E0A
+		Sub AppendRow()
+		  ' Grow the sheet extent by one (empty) row at the bottom. No cells are
+		  ' stored — CellAt returns the empty sentinel until something is put there.
+		  mMaxRow = mMaxRow + 1
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 44726F702074686520626F74746F6D20726F773A2064656C657465206974732073746F7265642063656C6C7320616E6420736872696E6B2074686520657874656E742E0A
+		Sub RemoveLastRow()
+		  ' Drop the bottom row: delete its stored cells and shrink the extent.
+		  If mMaxRow < 1 Then Return
+		  For c As Integer = 1 To mMaxCol
+		    Var key As Integer = (mMaxRow * 16384) + c
+		    If mCells.HasKey(key) Then mCells.Remove(key)
+		  Next
+		  mMaxRow = mMaxRow - 1
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 47726F772074686520736865657420657874656E74206279206F6E6520656D70747920636F6C756D6E2061742074686520726967687420286E6F2063656C6C732073746F726564292E0A
+		Sub AppendColumn()
+		  ' Grow the sheet extent by one (empty) column at the right.
+		  mMaxCol = mMaxCol + 1
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 44726F70207468652072696768746D6F737420636F6C756D6E3A2064656C657465206974732073746F7265642063656C6C7320616E6420736872696E6B2074686520657874656E742E0A
+		Sub RemoveLastColumn()
+		  ' Drop the rightmost column: delete its stored cells and shrink the extent.
+		  If mMaxCol < 1 Then Return
+		  For r As Integer = 1 To mMaxRow
+		    Var key As Integer = (r * 16384) + mMaxCol
+		    If mCells.HasKey(key) Then mCells.Remove(key)
+		  Next
+		  mMaxCol = mMaxCol - 1
+		End Sub
+	#tag EndMethod
+
 	#tag Method, Flags = &h0, Description = 4869676865737420726F77206E756D626572207769746820612073746F7265642063656C6C2E0A
 		Function RowCount() As Integer
 		  Return mMaxRow

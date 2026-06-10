@@ -112,6 +112,10 @@ All shared parser code lives in `Common/`. Per-project UI fillers live in their 
 | `XLSXReader.Open(data As MemoryBlock, sourceName As String [, mode])` | Module function | Same, for in-memory input |
 | `ODSReader.Open(file As FolderItem [, mode])` | Module function | OpenDocument (.ods) entry; returns the same `XLSXWorkbook` model |
 | `ODSReader.Open(data As MemoryBlock, sourceName As String [, mode])` | Module function | Same, for in-memory input |
+| `SpreadsheetWriter.Save(wb, file)` | Module function | **Format-agnostic save.** Destination extension picks the serializer: `.ods` → `ODSWriter`, else → `XLSXWriter` |
+| `XLSXWriter.Save(wb, file)` / `.ToMemoryBlock(wb)` | Module functions | Serialize the workbook model to .xlsx (OPC zip; inline strings, custom numFmts 164+, mergeCells) |
+| `ODSWriter.Save(wb, file)` / `.ToMemoryBlock(wb)` | Module functions | Serialize the workbook model to .ods (mimetype first + stored; format codes → `<number:*-style>` trees) |
+| `SpreadsheetZipWriter` | Class | In-memory zip builder used by both writers: raw deflate from `MemoryBlock.Compress` (wrapper stripped), own CRC-32, ordered entries with per-entry stored control |
 | `XLSXWorkbook` | Class | Owns sheets, shared strings, styles. The shared model for both formats. |
 | `XLSXSheet` | Class | One sheet's cells + merged ranges |
 | `XLSXCell` | Class | One cell + lazy `DisplayText(styles)` |

@@ -56,6 +56,37 @@ Begin DesktopWindow MainWindow
       Visible         =   True
       Width           =   140
    End
+   Begin DesktopButton ButtonNew
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrNewButton"
+      Default         =   False
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   156
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   6
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   8
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   100
+   End
    Begin DesktopCheckBox CheckboxInMemory
       AllowAutoDeactivate=   True
       Bold            =   False
@@ -67,7 +98,7 @@ Begin DesktopWindow MainWindow
       Height          =   20
       Index           =   -2147483648
       Italic          =   False
-      Left            =   160
+      Left            =   8
       LockBottom      =   False
       LockedInPosition=   False
       LockLeft        =   True
@@ -79,7 +110,7 @@ Begin DesktopWindow MainWindow
       TabPanelIndex   =   0
       TabStop         =   True
       Tooltip         =   ""
-      Top             =   10
+      Top             =   44
       Transparent     =   False
       Underline       =   False
       Visible         =   True
@@ -97,7 +128,7 @@ Begin DesktopWindow MainWindow
       Height          =   20
       Index           =   -2147483648
       Italic          =   False
-      Left            =   324
+      Left            =   176
       LockBottom      =   False
       LockedInPosition=   False
       LockLeft        =   True
@@ -112,11 +143,166 @@ Begin DesktopWindow MainWindow
       TextAlignment   =   0
       TextColor       =   &c777777
       Tooltip         =   ""
-      Top             =   10
+      Top             =   44
       Transparent     =   False
       Underline       =   False
       Visible         =   True
-      Width           =   400
+      Width           =   290
+   End
+   Begin DesktopButton ButtonAddRow
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrAddRow"
+      Default         =   False
+      Enabled         =   False
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   596
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   False
+      LockRight       =   True
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   7
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   40
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   70
+   End
+   Begin DesktopButton ButtonDelRow
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrDelRow"
+      Default         =   False
+      Enabled         =   False
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   670
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   False
+      LockRight       =   True
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   8
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   40
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   70
+   End
+   Begin DesktopButton ButtonAddCol
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrAddCol"
+      Default         =   False
+      Enabled         =   False
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   744
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   False
+      LockRight       =   True
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   9
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   40
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   70
+   End
+   Begin DesktopButton ButtonDelCol
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrDelCol"
+      Default         =   False
+      Enabled         =   False
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   818
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   False
+      LockRight       =   True
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   10
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   40
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   70
+   End
+   Begin DesktopButton ButtonSave
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrSaveButton"
+      Default         =   False
+      Enabled         =   False
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   752
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   False
+      LockRight       =   True
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   5
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   8
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   140
    End
    Begin DesktopTabPanel TabPanelSheets
       AllowAutoDeactivate=   True
@@ -125,7 +311,7 @@ Begin DesktopWindow MainWindow
       FontName        =   "System"
       FontSize        =   0.0
       FontUnit        =   0
-      Height          =   560
+      Height          =   528
       Index           =   -2147483648
       Italic          =   False
       Left            =   0
@@ -142,7 +328,7 @@ Begin DesktopWindow MainWindow
       TabPanelIndex   =   0
       TabStop         =   True
       Tooltip         =   ""
-      Top             =   40
+      Top             =   72
       Transparent     =   False
       Underline       =   False
       Value           =   0
@@ -166,13 +352,13 @@ Begin DesktopWindow MainWindow
       FontName        =   "System"
       FontSize        =   0.0
       FontUnit        =   0
-      GridLineStyle   =   0
+      GridLineStyle   =   3
       HasBorder       =   True
       HasHeader       =   True
       HasHorizontalScrollbar=   True
       HasVerticalScrollbar=   True
       HeadingIndex    =   -1
-      Height          =   516
+      Height          =   484
       Index           =   -2147483648
       InitialValue    =   ""
       Italic          =   False
@@ -189,7 +375,7 @@ Begin DesktopWindow MainWindow
       TabPanelIndex   =   0
       TabStop         =   True
       Tooltip         =   ""
-      Top             =   72
+      Top             =   104
       Transparent     =   False
       Underline       =   False
       Visible         =   True
@@ -228,7 +414,48 @@ End
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Or idx >= mWorkbook.SheetCount Then Return
 		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
-		  XLSXDesktopListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles)
+		  XLSXDesktopListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles, mShowAllCells)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function CurrentSheet() As XLSXSheet
+		  If mWorkbook Is Nil Then Return Nil
+		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
+		  If idx < 0 Then Return Nil
+		  Return mWorkbook.SheetAt(idx + 1)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub DoNewWorkbook()
+		  ' Start a sheet from scratch: empty workbook, one sheet, 8x4 grid,
+		  ' shown in grid mode (all cells visible and editable).
+		  mWorkbook = XLSXHelpers.NewWorkbook(strings.kStrUntitledName, 8, 4)
+		  mShowAllCells = True
+		  Self.Title = strings.kStrAppTitle + " — " + mWorkbook.SourceName
+		  LabelParseTime.Text = ""
+		  EnableEditButtons
+		  RebuildTabs(mWorkbook)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub EnableEditButtons()
+		  ButtonSave.Enabled = True
+		  ButtonAddRow.Enabled = True
+		  ButtonDelRow.Enabled = True
+		  ButtonAddCol.Enabled = True
+		  ButtonDelCol.Enabled = True
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub RefreshAfterStructureChange()
+		  ' Structural edits switch to grid mode so the added/removed row or
+		  ' column is actually visible (viewing mode hides empty rows).
+		  mShowAllCells = True
+		  FillCurrentSheet
 		End Sub
 	#tag EndMethod
 
@@ -249,6 +476,8 @@ End
 		    Self.Title = strings.kStrAppTitle + " — " + wb.SourceName + " [" + Str(wb.SheetCount) + "]"
 		    LabelParseTime.Text = strings.kStrParseTime + Str(totalMs) + strings.kStrParseTimeUnit _
 		      + " (zip " + Str(zipMs) + " + xml " + Str(xmlMs) + ", " + wb.OpenMode.ToString + ")"
+		    mShowAllCells = False
+		    EnableEditButtons
 		    RebuildTabs(wb)
 		  Catch ex As XLSXException
 		    LabelParseTime.Text = ""
@@ -303,8 +532,109 @@ End
 	#tag EndMethod
 
 
+	#tag Method, Flags = &h21
+		Private Sub SaveWorkbook()
+		  If mWorkbook Is Nil Then Return
+
+		  Var dlg As New SaveFileDialog
+		  dlg.Title = strings.kStrSaveDialogTitle
+		  Var tXlsx As New FileType
+		  tXlsx.Name = strings.kStrFileTypeXlsx
+		  tXlsx.Extensions = "xlsx"
+		  Var tOds As New FileType
+		  tOds.Name = strings.kStrFileTypeOds
+		  tOds.Extensions = "ods"
+		  dlg.Filter = tXlsx + tOds
+
+		  ' Default to the format the workbook was loaded from; the user picks the
+		  ' other format by changing the extension in the dialog.
+		  Var defaultExt As String = ".xlsx"
+		  If mWorkbook.SourceName.Lowercase.EndsWith(".ods") Then defaultExt = ".ods"
+		  dlg.SuggestedFileName = BaseName(mWorkbook.SourceName) + defaultExt
+
+		  Var f As FolderItem = dlg.ShowModal(Self)
+		  If f = Nil Then Return
+
+		  Var lower As String = f.Name.Lowercase
+		  If Not lower.EndsWith(".xlsx") And Not lower.EndsWith(".ods") Then
+		    f = f.Parent.Child(f.Name + defaultExt)
+		  End If
+
+		  Try
+		    SpreadsheetWriter.Save(mWorkbook, f)
+		    LabelParseTime.Text = strings.kStrSavedPrefix + f.Name
+		  Catch ex As XLSXException
+		    ShowSaveError(ex.Detail)
+		  Catch ex As IOException
+		    ShowSaveError(ex.Message)
+		  End Try
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub ApplyCellEdit(lbRow As Integer, lbCol As Integer)
+		  ' Write a committed listbox edit back into the workbook model.
+		  If mWorkbook Is Nil Then Return
+		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
+		  If idx < 0 Then Return
+		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
+		  If sheet Is Nil Then Return
+
+		  Var sheetRow As Integer = ListboxData.RowTagAt(lbRow).IntegerValue
+		  Var sheetCol As Integer = lbCol + 1
+		  If sheetRow <= 0 Or sheetCol <= 0 Then Return
+
+		  Var newText As String = ListboxData.CellTextAt(lbRow, lbCol)
+		  Var oldCell As XLSXCell = sheet.CellAt(sheetRow, sheetCol)
+		  Var newCell As XLSXCell
+
+		  If newText.Trim = "" Then
+		    newCell = New XLSXCell(XLSXEnums.eCellType.Empty, "", oldCell.StyleIndex)
+		  ElseIf XLSXHelpers.IsNumericString(newText) Then
+		    ' Numeric input keeps the old cell's type family and format, so editing
+		    ' a date's serial or a formatted number preserves its rendering.
+		    Var newType As XLSXEnums.eCellType = XLSXEnums.eCellType.Number
+		    If oldCell.eType = XLSXEnums.eCellType.DateValue Then newType = XLSXEnums.eCellType.DateValue
+		    newCell = New XLSXCell(newType, newText.Trim, oldCell.StyleIndex)
+		    newCell.FormatCode = oldCell.FormatCode
+		  Else
+		    newCell = New XLSXCell(XLSXEnums.eCellType.Str, newText, -1)
+		  End If
+
+		  sheet.PutCell(sheetRow, sheetCol, newCell)
+		  ' Re-render through the formatter so the cell shows its formatted value.
+		  ListboxData.CellTextAt(lbRow, lbCol) = newCell.DisplayText(mWorkbook.Styles)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub ShowSaveError(detail As String)
+		  Var msg As String = strings.kStrErrorSaveGeneric
+		  If detail <> "" Then msg = msg + " (" + detail + ")"
+		  Var d As New MessageDialog
+		  d.Title = strings.kStrErrorSaveTitle
+		  d.Message = strings.kStrErrorSaveTitle
+		  d.Explanation = msg
+		  Call d.ShowModal
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function BaseName(name As String) As String
+		  ' Filename without its last extension ("Book1.xlsx" -> "Book1").
+		  Var parts() As String = name.Split(".")
+		  If parts.Count > 1 Then parts.RemoveAt(parts.LastIndex)
+		  Return String.FromArray(parts, ".")
+		End Function
+	#tag EndMethod
+
+
 	#tag Property, Flags = &h21
 		Private mWorkbook As XLSXWorkbook
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private mShowAllCells As Boolean = False
 	#tag EndProperty
 
 
@@ -323,6 +653,84 @@ End
 		Sub PanelChanged()
 		  ListboxData.PanelIndex = TabPanelSheets.SelectedPanelIndex + 1
 		  FillCurrentSheet
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonSave
+	#tag Event
+		Sub Pressed()
+		  SaveWorkbook
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonNew
+	#tag Event
+		Sub Pressed()
+		  DoNewWorkbook
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonAddRow
+	#tag Event
+		Sub Pressed()
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Then Return
+		  sheet.AppendRow
+		  RefreshAfterStructureChange
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonDelRow
+	#tag Event
+		Sub Pressed()
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Or sheet.RowCount <= 1 Then Return
+		  sheet.RemoveLastRow
+		  RefreshAfterStructureChange
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonAddCol
+	#tag Event
+		Sub Pressed()
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Then Return
+		  sheet.AppendColumn
+		  RefreshAfterStructureChange
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonDelCol
+	#tag Event
+		Sub Pressed()
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Or sheet.ColCount <= 1 Then Return
+		  sheet.RemoveLastColumn
+		  RefreshAfterStructureChange
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ListboxData
+	#tag Event
+		Function CellPressed(row As Integer, column As Integer, x As Integer, y As Integer) As Boolean
+		  ' Click a cell to edit it in place; CellAction commits the edit.
+		  If mWorkbook Is Nil Then Return False
+		  If row < 0 Or column < 0 Then Return False
+		  Me.CellTypeAt(row, column) = DesktopListBox.CellTypes.TextField
+		  Me.EditCellAt(row, column)
+		  Return True
+		End Function
+	#tag EndEvent
+	#tag Event
+		Sub CellAction(row As Integer, column As Integer)
+		  ApplyCellEdit(row, column)
 		End Sub
 	#tag EndEvent
 #tag EndEvents
