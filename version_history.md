@@ -4,6 +4,31 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 While `MAJOR=0`, breaking changes can occur on `MINOR` bumps.
 
+## [0.4.0] - 2026-06-10
+
+### Added
+
+- **Write `.xlsx` and `.ods` files** — save any open workbook in either format, with full cross-format conversion. `SpreadsheetWriter.Save(wb, file)` picks the serializer from the destination extension; `XLSXWriter` / `ODSWriter` also expose `ToMemoryBlock(wb)` for in-memory use.
+  - XLSX: OPC parts with inline strings (no sharedStrings table), a custom numFmt (id 164+) per distinct format code, `<mergeCells>`, and `<dimension>` + `<sheetFormatPr defaultRowHeight="15">` so minimal renderers size rows correctly.
+  - ODS: `mimetype` first and stored per the ODF packaging spec, `manifest.xml`, and `content.xml` with format codes converted back into `<number:*-style>` element trees (dates/times with month-vs-minutes disambiguation, percentage, currency `[$SYM]`, grouped numbers); ISO dates, `PTnHnMnS` durations, merge spans + covered cells.
+  - Both assemble through `SpreadsheetZipWriter`, a pure-Xojo in-memory zip builder (raw deflate from `MemoryBlock.Compress`, own CRC-32, ordered entries with per-entry stored control). No temp files.
+- **In-place cell editing (Desktop + Web)** — click a cell to edit; the commit writes back into the workbook model. Numeric input keeps the cell's type and number format (dates/currency re-render formatted), text becomes a string cell, blank empties it.
+- **Create a sheet from scratch** — a **New** button opens an empty editable grid (column letters as headers); **+ Row / − Row / + Col / − Col** buttons grow/shrink the sheet (they work on opened files too, switching the view to the full grid). Backed by new model API: `XLSXSheet.AppendRow/RemoveLastRow/AppendColumn/RemoveLastColumn`, `XLSXHelpers.NewWorkbook`.
+- **Save UX** — Desktop: **Save…** + native save dialog (on macOS the two file types appear as a *Format* popup; the chosen extension picks the format). Web: format picker + **Save…** pushing a browser download with the proper MIME type.
+- Grid display mode in both listbox fillers (`showAllCells`), gridlines always visible, and editing API additions: `XLSXCell.FormatCode` (direct format code, wins over `StyleIndex`), `XLSXHelpers.XmlEscape` / `EffectiveFormatCode` / `WriteFormatCode` / `IsNumericString`, `XLSXFormatter.DateTimeToExcelSerial`.
+
+### Fixed
+
+- macOS **Quick Look** rendered huge row heights for data rows in saved `.xlsx` files; saved sheets now declare the default row height and a complete font. Excel/LibreOffice were unaffected either way.
+
+### Compatibility
+
+- No breaking changes — all reader APIs unchanged; writers and editing API are pure additions.
+
+### Known limitations (writing)
+
+- Formula text is not preserved (the cached value is written); cell colors / fonts / borders are not written; ODS number formats outside the supported subset save as unstyled values.
+
 ## [0.3.0] - 2026-06-08
 
 ### Added

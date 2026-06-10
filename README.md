@@ -1,7 +1,7 @@
 # VNS XLSX Reader
 
 [![Xojo](https://img.shields.io/badge/Xojo-2026r1-blue)](https://www.xojo.com)
-[![Version](https://img.shields.io/badge/version-0.3.0-green)](version_history.md)
+[![Version](https://img.shields.io/badge/version-0.4.0-green)](version_history.md)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
