@@ -4,6 +4,36 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 While `MAJOR=0`, breaking changes can occur on `MINOR` bumps.
 
+## [0.5.0] - 2026-07-28
+
+### Added
+- **Formulas — read & write (XLSX).** Formula text is now preserved instead of being flattened to the cached value: reading keeps each cell's `<f>` (A1) text, and saving re-emits it — so formulas survive an open → edit → save → reopen round-trip.
+  - **Fluent authoring API.** `XLSXCell` gains Shared factories `TextCell` / `NumberCell` / `MoneyCell` / `DateCell` / `DateTimeCell` / `BoolCell` / `FormulaCell` / `FormulaCellA1`, plus chainable style mutators (`.Bold` / `.Italic` / `.Underline` / `.Money` / `.Format(code)` / `.Align(h)` / `.BackColor` / `.FontColor` / `.FontFace` / `.FontSize`, each returning the cell). `XLSXSheet` gains an indexed accessor (`ws.Cell(r,c) = cell`) and placers (`PutText` / `PutNumber` / `PutMoney` / `PutDate` / `PutDateTime` / `PutBool` / `PutFormula` / `PutFormulaA1`) that place a cell and return it for chaining. `XLSXWorkbook.AddSheet(name)` creates and returns an empty sheet.
+  - **R1C1 authoring.** `FormulaCell` / `PutFormula` accept Excel **R1C1 relative** notation (e.g. `SUM(R[+3]C:R[+1000]C)`, `RC[-2]`) and convert it to A1 at write time, anchored at the cell — so `SUM(R[+3]C:R[+1000]C)` placed at (1,6) is written `SUM(F4:F1001)`. A leading `=` is optional. `FormulaCellA1` / `PutFormulaA1` take plain A1, written verbatim.
+  - **"Show formulas" toggle (Desktop + Web).** A checkbox flips the grid between cached values (default) and the `=…` formula text, per sheet. `XLSXCell.HasFormula` / `FormulaText` back it.
+  - Out of scope this pass (parked): **ODS** formula read/write (saving to `.ods` still writes the cached value only), formula **evaluation** (cached value shown; we don't compute).
+- **Cell styling (whole-cell): fonts, fills, alignment, borders — read, render (Desktop) and write.** A new `XLSXCellStyle` value object carries font (bold/italic/underline/name/size/color), solid fill background, horizontal/vertical alignment + wrap, and per-edge borders (None/Thin/Medium/Thick + color).
+  - **Read (XLSX):** `XLSXStyles` parses `<fonts>` / `<fills>` / `<borders>` and resolves each cellXf to an `XLSXCellStyle` (`CellStyleAt`). `XLSXCell.ResolvedStyle` / `CellStyle`.
+  - **Theme & indexed colours:** `XLSXStyles` now reads `xl/theme/theme1.xml` and resolves `<color theme="N" tint="…"/>` (with the Excel dk/lt index swap and the HSL tint algorithm, verified against Excel's swatch values) plus the legacy `<color indexed="N"/>` palette — so theme-coloured fills/fonts/borders render instead of being dropped.
+  - **Excel Tables (ListObjects):** the reader parses `xl/tables/*.xml` (via each worksheet's `<tableParts>` + rels) into `XLSXTable` objects on the sheet. A built-in table style name (e.g. `TableStyleLight9`) is resolved against the theme into a synthetic header fill (solid accent + white bold) and banded-row tint by `XLSXStyles.TableStyleCell`, and `XLSXSheet.EffectiveStyle` applies it to table cells that have no explicit style of their own — so a table's coloured header + row stripes now render (e.g. the Microsoft financial sample) on Desktop and Web. The accent is derived from the style-name number (groups of seven). *Rendering only — table styling is not yet re-written on Save (the saved file keeps explicit cell styles but drops the table overlay).*
+  - **Render (Desktop):** the listbox paints cell fills + borders (`PaintCellBackground`) and font + horizontal alignment (`PaintCellText`).
+  - **Styled first row stays a data row:** a plain first row is still promoted to the column-header bar, but a *styled* first row (a designed header) is shown as the first data row with A/B/C column letters, so its fill/font renders natively on **both** Desktop and Web instead of being lost in the unstyleable header bar (`XLSX*ListboxFiller.PromotesHeader`).
+  - **Write (XLSX):** the writer emits real `<fonts>` / `<fills>` / `<borders>` / `<cellXfs>` — one deduped xf per distinct appearance — so styling survives a save/round-trip (previously dropped).
+  - **Write (ODS):** `ODSWriter` emits each cell style as a `<style:style>` with `<style:table-cell-properties>` (fill, per-edge borders, vertical align, wrap), `<style:paragraph-properties>` (horizontal align), and `<style:text-properties>` (font weight/style/underline/colour/size/family), keyed by the same appearance signature.
+  - **Render (Web):** `XLSXWebListboxFiller` applies a `WebListBoxStyleRenderer`/`WebStyle` per styled cell (fill, text colour, bold/italic/underline, font name/size, uniform border). WebStyle has no alignment, so numeric right-align isn't reproduced on the Web.
+  - **Viewing mode now trims only *trailing* empty rows** (the styled-bloat case) and keeps *interior* empty rows, so the on-screen grid matches the file and a saved copy of it (`XLSX*ListboxFiller.LastContentRow`).
+  - New enums `XLSXEnums.eAlignH` / `eAlignV` / `eBorderStyle`. Styled test fixtures: `styled-basics` / `styled-borders` / `styled-combined.xlsx`, `theme-colors.xlsx`.
+  - Out of scope (parked): rich text (per-run formatting within a cell), ODS style **read**, Excel Table **write** (re-emit the table overlay on Save), Web cell alignment.
+- **Column widths & row heights — read, write, and preserve.** Opening a workbook now captures each column's width and each custom row height; saving writes them back (XLSX `<cols>` + row `ht`; ODS per-column/row styles), so round-tripping no longer flattens the layout. Cross-format conversion carries them too.
+  - Model: `XLSXSheet.ColumnWidth` / `SetColumnWidth` / `RowHeight` / `SetRowHeight` (+ `HasColumnWidths` / `HasRowHeights`). Canonical unit is **points**.
+  - Unit conversion helpers in `XLSXHelpers`: `ColumnCharsToPoints` / `ColumnPointsToChars` (Excel character units) and `OdsLengthToPoints` / `PointsToOdsLength` (cm/mm/in/pt/pc/px).
+  - Desktop: the listbox seeds real column widths (falling back to the content heuristic for columns with none), and **user column-resizes are captured back into the model** (on Save and when switching sheets) so the saved file matches what's on screen. Web: `WebListBox.ColumnWidths` set from the real widths (points → pixels); capturing a Web user's resize is a later follow-up.
+  - Note: neither listbox control supports per-row heights, so row heights are **preserved on round-trip** (model + both writers) but the on-screen grid uses a uniform row height.
+- **1904 date system.** Workbooks authored with the 1904 epoch (common from older Mac Excel) declared via `<workbookPr date1904="1"/>` now read correctly — their date serials were previously ~4 years off. Detected on open and normalized to the 1900 system the model uses, so dates display and re-save correctly. (ODS is unaffected — it stores ISO dates.)
+
+### Fixed
+- **Spurious borders on styled cells from LibreOffice-saved files.** A border edge written as `<left style="none"/>` (how LibreOffice emits "no border"; Excel omits the attribute) was misread as a thin border, so any custom-painted cell (bold/italic/filled) picked up phantom borders. `"none"` now resolves to no border.
+
 ## [0.4.0] - 2026-06-10
 
 ### Added

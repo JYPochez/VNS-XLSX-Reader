@@ -31,23 +31,23 @@ Open any Excel or OpenDocument workbook → one tab per sheet → cell values re
 
 ## Screenshots
 
-![VNS XLSX Reader desktop — the Microsoft Financial Sample open, rendering its Excel Table style (blue header + banded rows) resolved from the workbook theme](screenshot.png)
+![VNS XLSX Reader desktop — the Microsoft Financial Sample open, rendering its Excel Table style (blue header + banded rows) resolved from the workbook theme](screenshots/screenshot.png)
 
 The Desktop window: **Open… / New / Save…** buttons, "Read in memory" checkbox, per-phase parse-time label (`Parsed in 287 ms (zip 4 + xml 283, Memory)`), and the **+ Row / − Row / + Col / − Col** structure buttons. Here it opens the Microsoft *Financial Sample* — an Excel **Table** whose blue header and banded rows are rendered from the table's built-in style and the workbook theme. Web has the same controls and styling.
 
-![Editing a cell in place — the clicked cell turns into a text field](screenshot-edit-cell.png)
+![Editing a cell in place — the clicked cell turns into a text field](screenshots/screenshot-edit-cell.png)
 
 **In-place editing**: click any cell to edit it; the committed value is written back into the workbook model and re-rendered through the format engine.
 
-![A brand-new empty sheet — editable grid with column-letter headers](screenshot-new-sheet.png)
+![A brand-new empty sheet — editable grid with column-letter headers](screenshots/screenshot-new-sheet.png)
 
 **Creating a sheet from scratch**: **New** opens an empty editable grid (column letters as headers); grow it with the row/column buttons, fill cells, then save as `.xlsx` or `.ods`.
 
-![The macOS save dialog with the Format popup offering Excel Workbook and OpenDocument Spreadsheet](screenshot-save-format.png)
+![The macOS save dialog with the Format popup offering Excel Workbook and OpenDocument Spreadsheet](screenshots/screenshot-save-format.png)
 
 **Saving**: the save dialog offers both formats — on macOS the two file types surface as a native *Format* popup, so an opened `.xlsx` can be saved as `.ods` and vice versa.
 
-![Cell styling rendered — accent fills with lighter/darker tints, the six theme accent colours, and a theme font colour](screenshot-styling.png)
+![Cell styling rendered — accent fills with lighter/darker tints, the six theme accent colours, and a theme font colour](screenshots/screenshot-styling.png)
 
 **Cell styling & theme colours**: fills, fonts and borders are rendered on Desktop and Web; colours referencing the workbook theme (with their lighter/darker tints) and the legacy indexed palette resolve to the right colour.
 
