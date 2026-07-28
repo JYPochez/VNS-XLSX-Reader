@@ -10,7 +10,206 @@ Protected Class XLSXCell
 
 	#tag Method, Flags = &h0, Description = 52657475726E73205472756520696620655479706520697320456D707479206F7220526177537472696E6720697320656D7074792E0A
 		Function IsEmpty() As Boolean
+		  ' A formula cell is never "empty" even before it carries a cached value,
+		  ' so writers and listbox fillers keep it instead of skipping it.
+		  If eType = XLSXEnums.eCellType.FormulaCached And Formula <> "" Then Return False
 		  Return eType = XLSXEnums.eCellType.Empty Or RawString = ""
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function HasFormula() As Boolean
+		  ' True if this cell carries a formula (whose text we preserved).
+		  Return eType = XLSXEnums.eCellType.FormulaCached And Formula <> ""
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function FormulaText() As String
+		  ' The formula as an "=" expression for display (empty if not a formula).
+		  If Not HasFormula Then Return ""
+		  Return "=" + Formula
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function TextCell(text As String) As XLSXCell
+		  ' Fluent authoring: a string cell.
+		  Return New XLSXCell(XLSXEnums.eCellType.Str, text)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function NumberCell(value As Double) As XLSXCell
+		  ' Fluent authoring: a plain number cell. Str() keeps the invariant
+		  ' period-decimal form the writers put verbatim into <v>.
+		  Return New XLSXCell(XLSXEnums.eCellType.Number, Str(value))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function MoneyCell(value As Double) As XLSXCell
+		  ' Fluent authoring: a number cell with a two-decimal thousands format.
+		  Var c As New XLSXCell(XLSXEnums.eCellType.Number, Str(value))
+		  c.FormatCode = kMoneyFormat
+		  Return c
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function DateCell(dt As DateTime) As XLSXCell
+		  ' Fluent authoring: a date cell (Excel serial + ISO date format).
+		  Var c As New XLSXCell(XLSXEnums.eCellType.DateValue, Str(XLSXFormatter.DateTimeToExcelSerial(dt)))
+		  c.FormatCode = kDateFormat
+		  Return c
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function DateTimeCell(dt As DateTime) As XLSXCell
+		  ' Fluent authoring: a date+time cell (Excel serial + ISO date-time format).
+		  Var c As New XLSXCell(XLSXEnums.eCellType.DateValue, Str(XLSXFormatter.DateTimeToExcelSerial(dt)))
+		  c.FormatCode = kDateTimeFormat
+		  Return c
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function BoolCell(value As Boolean) As XLSXCell
+		  ' Fluent authoring: a boolean cell.
+		  Return New XLSXCell(XLSXEnums.eCellType.Bool, If(value, "1", "0"))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function FormulaCell(formula As String) As XLSXCell
+		  ' Fluent authoring: a formula in Excel R1C1 relative notation
+		  ' (e.g. "SUM(R[+3]C:R[+1000]C)"). Converted to A1 at write time using
+		  ' the cell's anchor position. A leading "=" is optional and stripped.
+		  Return MakeFormula(formula, True)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Shared Function FormulaCellA1(formula As String) As XLSXCell
+		  ' Fluent authoring: a formula in plain A1 notation (e.g. "SUM(F4:F1001)").
+		  ' Written verbatim. A leading "=" is optional and stripped.
+		  Return MakeFormula(formula, False)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Shared Function MakeFormula(formula As String, isR1C1 As Boolean) As XLSXCell
+		  Var f As String = formula
+		  If f.Left(1) = "=" Then f = f.Middle(1)
+		  Var c As New XLSXCell(XLSXEnums.eCellType.FormulaCached, "")
+		  c.Formula = f
+		  c.FormulaIsR1C1 = isR1C1
+		  Return c
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function EnsureStyle() As XLSXCellStyle
+		  ' Lazily create the per-cell CellStyle so the fluent mutators can set it.
+		  If CellStyle Is Nil Then CellStyle = New XLSXCellStyle
+		  Return CellStyle
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function Bold(on As Boolean = True) As XLSXCell
+		  ' Fluent style: make the cell bold. Returns Me for chaining.
+		  EnsureStyle.Bold = on
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function Italic(on As Boolean = True) As XLSXCell
+		  EnsureStyle.Italic = on
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function Underline(on As Boolean = True) As XLSXCell
+		  EnsureStyle.Underline = on
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function Format(code As String) As XLSXCell
+		  ' Fluent style: set the number format code (e.g. "#,##0.00", "0%").
+		  FormatCode = code
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function Money() As XLSXCell
+		  ' Fluent style: two-decimal thousands number format.
+		  FormatCode = kMoneyFormat
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function Align(h As XLSXEnums.eAlignH) As XLSXCell
+		  ' Fluent style: horizontal alignment.
+		  EnsureStyle.AlignH = h
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function BackColor(c As Color) As XLSXCell
+		  ' Fluent style: solid background fill.
+		  Var st As XLSXCellStyle = EnsureStyle
+		  st.BackgroundColor = c
+		  st.HasBackground = True
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function FontColor(c As Color) As XLSXCell
+		  ' Fluent style: font colour.
+		  Var st As XLSXCellStyle = EnsureStyle
+		  st.FontColor = c
+		  st.HasFontColor = True
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function FontFace(name As String) As XLSXCell
+		  ' Fluent style: font name. (FontFace avoids clashing with XLSXCellStyle.FontName.)
+		  EnsureStyle.FontName = name
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function FontSize(points As Double) As XLSXCell
+		  ' Fluent style: font size in points.
+		  EnsureStyle.FontSize = points
+		  Return Me
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function Border(style As XLSXEnums.eBorderStyle, borderColor As Color = &c000000) As XLSXCell
+		  ' Fluent style: same border on all four edges.
+		  Var st As XLSXCellStyle = EnsureStyle
+		  st.BorderLeft = style
+		  st.BorderRight = style
+		  st.BorderTop = style
+		  st.BorderBottom = style
+		  st.BorderColor = borderColor
+		  st.HasBorderColor = True
+		  Return Me
 		End Function
 	#tag EndMethod
 
@@ -33,6 +232,18 @@ Protected Class XLSXCell
 		  If RawString = "1" Then Return True
 		  If RawString.Lowercase = "true" Then Return True
 		  Return False
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 5468652063656C6C27732076697375616C207374796C653A2061206469726563746C792D7365742043656C6C5374796C652077696E7320284F44532F656469746564292C20656C7365207265736F6C7665205374796C65496E6465782076696120584C53585374796C65732E204E65766572204E696C2E0A
+		Function ResolvedStyle(styles As XLSXStyles) As XLSXCellStyle
+		  ' The cell's visual style: a directly-set CellStyle wins (ODS-loaded /
+		  ' edited cells), otherwise resolve StyleIndex via the workbook's XLSXStyles.
+		  ' Never Nil — falls back to a shared default style.
+		  If CellStyle <> Nil Then Return CellStyle
+		  If styles <> Nil And StyleIndex >= 0 Then Return styles.CellStyleAt(StyleIndex)
+		  If mDefaultStyle Is Nil Then mDefaultStyle = New XLSXCellStyle
+		  Return mDefaultStyle
 		End Function
 	#tag EndMethod
 
@@ -74,6 +285,23 @@ Protected Class XLSXCell
 		FormatCode As String
 	#tag EndProperty
 
+	#tag Property, Flags = &h0, Description = 41206469726563746C792D7365742076697375616C207374796C652028652E672E20666F72204F44532D6C6F61646564206F72206564697465642063656C6C73293B207768656E2070726573656E742069742077696E73206F76657220746865205374796C65496E646578206C6F6F6B75702E0A
+		CellStyle As XLSXCellStyle
+	#tag EndProperty
+
+	#tag Property, Flags = &h0
+		Formula As String
+	#tag EndProperty
+
+	#tag Property, Flags = &h0
+		FormulaIsR1C1 As Boolean = False
+	#tag EndProperty
+
+
+	#tag Property, Flags = &h21
+		Private mDefaultStyle As XLSXCellStyle
+	#tag EndProperty
+
 	#tag Property, Flags = &h21, Description = 43616368656420446973706C61795465787420726573756C742E0A
 		Private mDisplayCache As String
 	#tag EndProperty
@@ -81,6 +309,15 @@ Protected Class XLSXCell
 	#tag Property, Flags = &h21, Description = 54727565206F6E636520446973706C61795465787420686173206265656E20636F6D70757465642E0A
 		Private mDisplayCached As Boolean = False
 	#tag EndProperty
+
+	#tag Constant, Name = kMoneyFormat, Type = String, Dynamic = False, Default = \"#,##0.00", Scope = Private
+	#tag EndConstant
+
+	#tag Constant, Name = kDateFormat, Type = String, Dynamic = False, Default = \"yyyy-mm-dd", Scope = Private
+	#tag EndConstant
+
+	#tag Constant, Name = kDateTimeFormat, Type = String, Dynamic = False, Default = \"yyyy-mm-dd hh:mm", Scope = Private
+	#tag EndConstant
 
 	#tag Note, Name = About
 		One parsed cell from a worksheet.

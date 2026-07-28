@@ -18,6 +18,8 @@ Open any Excel or OpenDocument workbook → one tab per sheet → cell values re
 - ✏️ **Edit cells in place** — click a cell to edit it; numeric input keeps the cell's type and number format (dates and currency re-render formatted), text becomes a string cell.
 - 🆕 **Create a sheet from scratch** — the **New** button opens an empty editable grid, and **+ Row / − Row / + Col / − Col** buttons grow or shrink the sheet (they work on opened files too). Save it as `.xlsx` or `.ods` like any workbook.
 - 💾 **Save / export to `.xlsx` AND `.ods`** — from either app, in either format (full cross-format conversion). Desktop uses the native save dialog (on macOS the two file types appear as a real *Format* popup); Web offers a format picker + browser download. Powered by a pure-Xojo in-memory zip writer (`MemoryBlock.Compress` + own CRC-32; ODS `mimetype` first and stored, per spec).
+- 🎨 **Cell styling** (whole-cell) — fonts (bold/italic/underline/name/size/colour), fill backgrounds, alignment and per-edge borders are read, rendered on **Desktop and Web**, and written back to **`.xlsx` and `.ods`** (round-trips through a save). Colours resolve from direct RGB, **theme colours** (`theme` + `tint`, read from `theme1.xml`) and the legacy indexed palette.
+- 📊 **Excel Tables** — a table's built-in style (e.g. *TableStyleLight9*) is rendered with its coloured header and banded rows, generated from the style name × the workbook theme (the Microsoft financial sample renders as designed).
 - 📑 **One tab per sheet**, picked from the workbook's sheet order.
 - 🔢 **Resolves cell types**: shared strings, numbers, booleans, errors, inline strings, formulas (cached values).
 - 📅 **Excel format codes**: a pragmatic subset for numbers (`0`, `0.00`, `#,##0`, `#,##0.00`, `0%`, `0.00%`), **scientific** (`0.00E+00`), **accounting** (`_("$"* #,##0.00_)…` with parens for negatives), **currency tags** (`[$X-Y]`), and dates (`dd/mm/yyyy`, `yyyy-mm-dd`, `m/d/yy h:mm`, `hh:mm`, …); custom `numFmtId ≥ 164` from `styles.xml` honored.
@@ -29,9 +31,9 @@ Open any Excel or OpenDocument workbook → one tab per sheet → cell values re
 
 ## Screenshots
 
-![VNS XLSX Reader desktop — Microsoft Financial Sample workbook open, with the per-phase parse-time readout and the New / Save / row-column buttons](screenshot.png)
+![VNS XLSX Reader desktop — the Microsoft Financial Sample open, rendering its Excel Table style (blue header + banded rows) resolved from the workbook theme](screenshot.png)
 
-The Desktop window: **Open… / New / Save…** buttons, "Read in memory" checkbox, per-phase parse-time label (`Parsed in 241 ms (zip 1 + xml 240, Memory)`), and the **+ Row / − Row / + Col / − Col** structure buttons. Web has the same controls.
+The Desktop window: **Open… / New / Save…** buttons, "Read in memory" checkbox, per-phase parse-time label (`Parsed in 287 ms (zip 4 + xml 283, Memory)`), and the **+ Row / − Row / + Col / − Col** structure buttons. Here it opens the Microsoft *Financial Sample* — an Excel **Table** whose blue header and banded rows are rendered from the table's built-in style and the workbook theme. Web has the same controls and styling.
 
 ![Editing a cell in place — the clicked cell turns into a text field](screenshot-edit-cell.png)
 
@@ -44,6 +46,10 @@ The Desktop window: **Open… / New / Save…** buttons, "Read in memory" checkb
 ![The macOS save dialog with the Format popup offering Excel Workbook and OpenDocument Spreadsheet](screenshot-save-format.png)
 
 **Saving**: the save dialog offers both formats — on macOS the two file types surface as a native *Format* popup, so an opened `.xlsx` can be saved as `.ods` and vice versa.
+
+![Cell styling rendered — accent fills with lighter/darker tints, the six theme accent colours, and a theme font colour](screenshot-styling.png)
+
+**Cell styling & theme colours**: fills, fonts and borders are rendered on Desktop and Web; colours referencing the workbook theme (with their lighter/darker tints) and the legacy indexed palette resolve to the right colour.
 
 ## Quick start
 
@@ -94,7 +100,9 @@ VNS-XLSX-Reader/
 │   ├── XLSXWorkbook.xojo_code       ← workbook aggregate
 │   ├── XLSXSheet.xojo_code          ← sheet model + parser + row/col operations
 │   ├── XLSXCell.xojo_code           ← cell + lazy DisplayText
-│   ├── XLSXStyles.xojo_code         ← styles.xml parser
+│   ├── XLSXCellStyle.xojo_code      ← whole-cell visual style (font/fill/align/borders)
+│   ├── XLSXTable.xojo_code          ← Excel Table (ListObject) overlay + style name
+│   ├── XLSXStyles.xojo_code         ← styles.xml + theme1.xml parser; theme/indexed colours; table styling
 │   ├── XLSXFormatter.xojo_code      ← number/date format codes
 │   ├── XLSXZip.xojo_code            ← zip reading (Memory / Disk backends)
 │   ├── XLSXEnums.xojo_code          ← eCellType / eParseError / eOpenMode
@@ -138,7 +146,8 @@ The two `.xojo_project` files reference every `Common/*.xojo_code` via `Module=`
 | Out of scope | Workaround / status |
 |---|---|
 | Formula evaluation | Cached values are shown as-is; saving writes the cached value (formula text is not kept) |
-| Cell colors / fonts / borders | Values only — no styling fidelity |
+| Cell colors / fonts / borders | Whole-cell styling read/render/write (XLSX + ODS); still out: ODS style **read**, rich text (per-run), Web cell alignment |
+| Excel Table styling on Save | Rendered on screen, but the table overlay isn't re-emitted when saving (explicit cell styles are kept) |
 | Images, charts, pivots | Ignored |
 | Conditional formatting | Ignored |
 | Encrypted (OLE-wrapped) workbooks | Surface as `NotAZip` |

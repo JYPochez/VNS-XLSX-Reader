@@ -13,6 +13,16 @@ Protected Class XLSXWorkbook
 		End Sub
 	#tag EndMethod
 
+	#tag Method, Flags = &h0
+		Function AddSheet(name As String) As XLSXSheet
+		  ' Fluent authoring: create an empty sheet, append it at the next index,
+		  ' and return it so the caller can start placing cells right away.
+		  Var s As New XLSXSheet(name, mSheets.KeyCount + 1)
+		  mSheets.Value(mSheets.KeyCount) = s
+		  Return s
+		End Function
+	#tag EndMethod
+
 	#tag Method, Flags = &h0, Description = 4E756D626572206F662073686565747320696E207468697320776F726B626F6F6B2E0A
 		Function SheetCount() As Integer
 		  Return mSheets.KeyCount

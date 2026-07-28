@@ -50,10 +50,13 @@ Protected Module ODSReader
 		    Raise New XLSXException(XLSXEnums.eParseError.MalformedXML, "content.xml")
 		  End Try
 
-		  ' Resolve styles: cellStyleName -> dataStyleName, dataStyleName -> formatCode.
+		  ' Resolve styles: cellStyleName -> dataStyleName, dataStyleName -> formatCode,
+		  ' columnStyleName -> width (pt), rowStyleName -> height (pt).
 		  Var cellStyles As New Dictionary
 		  Var dataStyles As New Dictionary
-		  ParseStyles(doc, cellStyles, dataStyles)
+		  Var colStyleWidths As New Dictionary
+		  Var rowStyleHeights As New Dictionary
+		  ParseStyles(doc, cellStyles, dataStyles, colStyleWidths, rowStyleHeights)
 
 		  ' styles.xml may carry additional named / data styles.
 		  Var stylesXml As String = zip.ReadPart("styles.xml")
@@ -61,7 +64,7 @@ Protected Module ODSReader
 		    Var sdoc As New XmlDocument
 		    Try
 		      sdoc.LoadXml(stylesXml)
-		      ParseStyles(sdoc, cellStyles, dataStyles)
+		      ParseStyles(sdoc, cellStyles, dataStyles, colStyleWidths, rowStyleHeights)
 		    Catch
 		      ' styles.xml is optional polish; ignore a malformed one.
 		    End Try
@@ -69,7 +72,7 @@ Protected Module ODSReader
 
 		  Var tables As XmlNodeList = doc.Xql("//*[local-name()='spreadsheet']/*[local-name()='table']")
 		  For i As Integer = 0 To tables.Length - 1
-		    Var sheet As XLSXSheet = ParseTable(tables.Item(i), i + 1, cellStyles, dataStyles)
+		    Var sheet As XLSXSheet = ParseTable(tables.Item(i), i + 1, cellStyles, dataStyles, colStyleWidths, rowStyleHeights)
 		    wb.AddSheet(sheet)
 		  Next
 
@@ -78,9 +81,34 @@ Protected Module ODSReader
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 4275696C6420616E20584C535853686565742066726F6D206F6E65207461626C653A7461626C652C20686F6E6F72696E67206E756D6265722D636F6C756D6E732F726F77732D726570656174656420616E6420636F6C756D6E2F726F77207370616E7320286D65726765642063656C6C73292E0A
-		Private Function ParseTable(tableNode As XmlNode, tabIndex As Integer, cellStyles As Dictionary, dataStyles As Dictionary) As XLSXSheet
+		Private Function ParseTable(tableNode As XmlNode, tabIndex As Integer, cellStyles As Dictionary, dataStyles As Dictionary, colStyleWidths As Dictionary, rowStyleHeights As Dictionary) As XLSXSheet
 		  Var name As String = tableNode.GetAttribute("table:name")
 		  Var sheet As New XLSXSheet(name, tabIndex)
+
+		  ' Column widths: <table:table-column> elements (in document order, honoring
+		  ' number-columns-repeated) carry a style whose column-width we resolved.
+		  Var colIndex As Integer = 0
+		  Var colNode As XmlNode = tableNode.FirstChild
+		  While colNode <> Nil
+		    If LocalName(colNode) = "table-column" Then
+		      Var rep As Integer = IntAttr(colNode, "table:number-columns-repeated", 1)
+		      If rep < 1 Then rep = 1
+		      Var styleName As String = colNode.GetAttribute("table:style-name")
+		      Var wpt As Double = 0.0
+		      If styleName <> "" And colStyleWidths.HasKey(styleName) Then wpt = colStyleWidths.Value(styleName)
+		      If wpt <= 0 Then
+		        colIndex = colIndex + rep
+		      Else
+		        Var reps As Integer = Min(rep, 4096)
+		        For k As Integer = 1 To reps
+		          colIndex = colIndex + 1
+		          sheet.SetColumnWidth(colIndex, wpt)
+		        Next
+		        If rep > reps Then colIndex = colIndex + (rep - reps)
+		      End If
+		    End If
+		    colNode = colNode.NextSibling
+		  Wend
 
 		  ' Descendant axis catches rows wrapped in <table:table-header-rows> / row groups.
 		  Var rows As XmlNodeList = tableNode.Xql(".//*[local-name()='table-row']")
@@ -89,6 +117,10 @@ Protected Module ODSReader
 		    Var rowNode As XmlNode = rows.Item(ri)
 		    Var rowRepeat As Integer = IntAttr(rowNode, "table:number-rows-repeated", 1)
 		    If rowRepeat < 1 Then rowRepeat = 1
+		    ' Custom row height (points) from the row's style, when present.
+		    Var rowHpt As Double = 0.0
+		    Var rowStyleName As String = rowNode.GetAttribute("table:style-name")
+		    If rowStyleName <> "" And rowStyleHeights.HasKey(rowStyleName) Then rowHpt = rowStyleHeights.Value(rowStyleName)
 
 		    ' Build this row's cell plan once.
 		    Var planCols() As Integer
@@ -138,6 +170,7 @@ Protected Module ODSReader
 		      Var emitRows As Integer = Min(rowRepeat, 4096)
 		      For iter As Integer = 0 To emitRows - 1
 		        Var rr As Integer = rowIdx + 1 + iter
+		        If rowHpt > 0 Then sheet.SetRowHeight(rr, rowHpt)
 		        For p As Integer = 0 To planCols.LastIndex
 		          sheet.PutCell(rr, planCols(p), planCells(p))
 		          If planColSpan(p) > 1 Or planRowSpan(p) > 1 Then
@@ -207,6 +240,12 @@ Protected Module ODSReader
 
 		  Var cell As New XLSXCell(eType, rawValue, -1)
 		  cell.FormatCode = formatCode
+		  ' Preserve the formula (ODF -> A1) for numeric formula cells so it survives
+		  ' a round-trip, matching the XLSX reader. (Date/bool/string formula results
+		  ' keep their computed value only.)
+		  If hasFormula And eType = XLSXEnums.eCellType.FormulaCached Then
+		    cell.Formula = XLSXHelpers.OdfFormulaToA1(cellNode.GetAttribute("table:formula"))
+		  End If
 		  Return cell
 		End Function
 	#tag EndMethod
@@ -222,7 +261,7 @@ Protected Module ODSReader
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 4275696C642063656C6C5374796C654E616D65202D3E20646174615374796C654E616D6520616E6420646174615374796C654E616D65202D3E20666F726D61742D636F6465206D6170732066726F6D206120636F6E74656E742E786D6C206F72207374796C65732E786D6C20646F63756D656E742E0A
-		Private Sub ParseStyles(doc As XmlDocument, cellStyles As Dictionary, dataStyles As Dictionary)
+		Private Sub ParseStyles(doc As XmlDocument, cellStyles As Dictionary, dataStyles As Dictionary, colStyleWidths As Dictionary, rowStyleHeights As Dictionary)
 		  ' Data styles: number / date / time / currency / percentage styles -> format code.
 		  ' One query per type (avoids relying on an XPath 'or' predicate).
 		  Var typeNames() As String = Array("number-style", "date-style", "time-style", "currency-style", "percentage-style")
@@ -236,14 +275,30 @@ Protected Module ODSReader
 		    Next
 		  Next
 
-		  ' Cell styles: <style:style style:family="table-cell"> -> its data-style-name.
+		  ' <style:style> entries: table-cell -> data-style-name; table-column ->
+		  ' column-width (points); table-row -> row-height (points).
 		  Var styleNodes As XmlNodeList = doc.Xql("//*[local-name()='style']")
 		  For i As Integer = 0 To styleNodes.Length - 1
 		    Var s As XmlNode = styleNodes.Item(i)
-		    If s.GetAttribute("style:family") <> "table-cell" Then Continue
 		    Var nm As String = s.GetAttribute("style:name")
-		    Var dn As String = s.GetAttribute("style:data-style-name")
-		    If nm <> "" And dn <> "" Then cellStyles.Value(nm) = dn
+		    If nm = "" Then Continue
+		    Select Case s.GetAttribute("style:family")
+		    Case "table-cell"
+		      Var dn As String = s.GetAttribute("style:data-style-name")
+		      If dn <> "" Then cellStyles.Value(nm) = dn
+		    Case "table-column"
+		      Var props As XmlNodeList = s.Xql("./*[local-name()='table-column-properties']")
+		      If props.Length > 0 Then
+		        Var w As String = props.Item(0).GetAttribute("style:column-width")
+		        If w <> "" Then colStyleWidths.Value(nm) = XLSXHelpers.OdsLengthToPoints(w)
+		      End If
+		    Case "table-row"
+		      Var props As XmlNodeList = s.Xql("./*[local-name()='table-row-properties']")
+		      If props.Length > 0 Then
+		        Var h As String = props.Item(0).GetAttribute("style:row-height")
+		        If h <> "" Then rowStyleHeights.Value(nm) = XLSXHelpers.OdsLengthToPoints(h)
+		      End If
+		    End Select
 		  Next
 		End Sub
 	#tag EndMethod

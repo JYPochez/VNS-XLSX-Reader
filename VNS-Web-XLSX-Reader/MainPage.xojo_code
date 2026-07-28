@@ -101,6 +101,72 @@ Begin WebPage MainPage
       Width           =   180
       _mPanelIndex    =   -1
    End
+   Begin WebCheckBox CheckboxShowFormulas
+      Bold            =   "False"
+      Caption         =   "#strings.kStrShowFormulas"
+      ControlID       =   ""
+      CSSClasses      =   ""
+      Enabled         =   True
+      FontName        =   ""
+      FontSize        =   "0.0"
+      Height          =   24
+      Index           =   -2147483648
+      Indicator       =   0
+      Italic          =   "False"
+      Left            =   500
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockHorizontal  =   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      LockVertical    =   False
+      PanelIndex      =   0
+      Scope           =   0
+      State           =   0
+      TabIndex        =   2
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   94
+      Underline       =   "False"
+      Value           =   False
+      Visible         =   True
+      Width           =   180
+      _mPanelIndex    =   -1
+   End
+   Begin WebButton ButtonGenCode
+      Bold            =   "False"
+      Cancel          =   False
+      Caption         =   "#strings.kStrGenCode"
+      ControlID       =   ""
+      CSSClasses      =   ""
+      Default         =   False
+      Enabled         =   True
+      FontName        =   ""
+      FontSize        =   "0.0"
+      Height          =   32
+      Index           =   -2147483648
+      Indicator       =   0
+      Italic          =   "False"
+      Left            =   690
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockHorizontal  =   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      LockVertical    =   False
+      PanelIndex      =   0
+      Scope           =   0
+      TabIndex        =   8
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   92
+      Underline       =   "False"
+      Visible         =   True
+      Width           =   110
+      _mPanelIndex    =   -1
+   End
    Begin WebLabel LabelParseTime
       Bold            =   "False"
       ControlID       =   ""
@@ -460,7 +526,7 @@ End
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Or idx >= mWorkbook.SheetCount Then Return
 		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
-		  XLSXWebListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles, mShowAllCells)
+		  XLSXWebListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles, mShowAllCells, CheckboxShowFormulas.Value)
 		End Sub
 	#tag EndMethod
 
@@ -610,6 +676,37 @@ End
 	#tag EndMethod
 
 	#tag Method, Flags = &h21
+		Private Sub GenerateCode()
+		  ' Generate ready-to-paste Xojo builder source for the current workbook and
+		  ' open it in a new browser tab inside a <textarea> for easy copy/paste.
+		  If mWorkbook Is Nil Then Return
+		  Var src As String = SpreadsheetCodeGen.Generate(mWorkbook)
+		  mCodeFile = New WebFile
+		  mCodeFile.MimeType = "text/html; charset=utf-8"
+		  mCodeFile.FileName = "BuildWorkbook.html"
+		  mCodeFile.ForceDownload = False
+		  mCodeFile.Data = CodePageHtml(src)
+		  Self.GoToURL(mCodeFile.URL, True)   ' True = new tab/window
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function CodePageHtml(code As String) As String
+		  ' Wrap the generated code in a minimal HTML page with a full-window
+		  ' <textarea>. Only &, < and > need escaping inside a textarea.
+		  Var esc As String = code.ReplaceAll("&", "&amp;")
+		  esc = esc.ReplaceAll("<", "&lt;").ReplaceAll(">", "&gt;")
+		  Var h() As String
+		  h.Add "<!DOCTYPE html><html><head><meta charset=""utf-8""><title>Xojo builder code</title></head>"
+		  h.Add "<body style=""margin:0"">"
+		  h.Add "<textarea readonly spellcheck=""false"" style=""width:100%;height:100vh;box-sizing:border-box;border:0;padding:12px;font-family:monospace;font-size:13px;white-space:pre"">"
+		  h.Add esc
+		  h.Add "</textarea></body></html>"
+		  Return String.FromArray(h, "")
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
 		Private Sub ApplyCellEdit(lbRow As Integer, lbCol As Integer, newText As String)
 		  ' Write a committed listbox edit back into the workbook model.
 		  If mWorkbook Is Nil Then Return
@@ -675,6 +772,10 @@ End
 	#tag EndProperty
 
 	#tag Property, Flags = &h21
+		Private mCodeFile As WebFile
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
 		Private mShowAllCells As Boolean = False
 	#tag EndProperty
 
@@ -715,6 +816,21 @@ End
 	#tag Event
 		Sub Pressed()
 		  DoNewWorkbook
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events ButtonGenCode
+	#tag Event
+		Sub Pressed()
+		  GenerateCode
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events CheckboxShowFormulas
+	#tag Event
+		Sub ValueChanged()
+		  ' Toggle between cached values and formula text; re-fill the current sheet.
+		  FillCurrentSheet
 		End Sub
 	#tag EndEvent
 #tag EndEvents

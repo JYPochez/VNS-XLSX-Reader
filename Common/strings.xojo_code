@@ -27,6 +27,12 @@ Protected Module strings
 	#tag Constant, Name = kStrInMemory, Type = String, Dynamic = True, Default = \"Read in memory", Scope = Public, Description = 43617074696F6E20666F722074686520225265616420696E206D656D6F72792220636865636B626F7820636F6E74726F6C6C696E6720584C53585A69702773206F70656E206261636B656E642E0A
 	#tag EndConstant
 
+	#tag Constant, Name = kStrShowFormulas, Type = String, Dynamic = True, Default = \"Show formulas", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = kStrGenCode, Type = String, Dynamic = True, Default = \"Gen code…", Scope = Public
+	#tag EndConstant
+
 	#tag Constant, Name = kStrParseTime, Type = String, Dynamic = True, Default = \"Parsed in ", Scope = Public, Description = 5072656669782073686F776E206E65787420746F2074686520696E2D6D656D6F727920636865636B626F78206265666F7265207468652070617273652D656C6170736564206D696C6C697365636F6E64732E0A
 	#tag EndConstant
 

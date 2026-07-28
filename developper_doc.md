@@ -6,6 +6,44 @@ Everything is pure-Xojo (API 2.0 only — no plugins, no external libraries) and
 
 ---
 
+## Contents
+
+- [Quick start](#quick-start)
+  - [Desktop — open](#desktop--open)
+  - [Desktop — save](#desktop--save)
+  - [Web 2.0 — open](#web-20--open)
+  - [Web 2.0 — save (browser download)](#web-20--save-browser-download)
+- [Architecture](#architecture)
+- [Class & module reference](#class--module-reference)
+  - [Common (shared between Desktop and Web)](#common-shared-between-desktop-and-web)
+  - [Per-project (UI-only)](#per-project-ui-only)
+- [Public API details](#public-api-details)
+  - [`SpreadsheetReader` / `XLSXReader` / `ODSReader` (Modules)](#spreadsheetreader--xlsxreader--odsreader-modules)
+  - [`SpreadsheetWriter` / `XLSXWriter` / `ODSWriter` (Modules)](#spreadsheetwriter--xlsxwriter--odswriter-modules)
+  - [`SpreadsheetZipWriter` (Class)](#spreadsheetzipwriter-class)
+  - [`XLSXWorkbook` (Class)](#xlsxworkbook-class)
+  - [`XLSXSheet` (Class)](#xlsxsheet-class)
+  - [`XLSXCell` (Class)](#xlsxcell-class)
+  - [`XLSXHelpers` (Module) — beyond the enum helpers](#xlsxhelpers-module--beyond-the-enum-helpers)
+  - [`XLSXCellStyle` (Class) — whole-cell visual style](#xlsxcellstyle-class--whole-cell-visual-style)
+  - [`XLSXTable` (Class) — Excel Table overlay](#xlsxtable-class--excel-table-overlay)
+  - [`XLSXEnums.eAlignH` / `eAlignV` / `eBorderStyle`](#xlsxenumsealignh--ealignv--eborderstyle)
+  - [`XLSXEnums.eCellType`](#xlsxenumsecelltype)
+  - [`XLSXEnums.eParseError`](#xlsxenumseparseerror)
+  - [`XLSXEnums.eOpenMode`](#xlsxenumseopenmode)
+- [Format-code support](#format-code-support)
+  - [Numeric formats](#numeric-formats)
+  - [Date / time formats](#date--time-formats)
+  - [Built-in numFmtId seeding](#built-in-numfmtid-seeding)
+  - [Adding a new format code](#adding-a-new-format-code)
+- [Limitations](#limitations)
+- [Test fixtures](#test-fixtures)
+- [Versioning](#versioning)
+- [Adding a new file to the Common pipeline](#adding-a-new-file-to-the-common-pipeline)
+  - [Description and Note attributes](#description-and-note-attributes)
+
+---
+
 ## Quick start
 
 ### Desktop — open
@@ -158,10 +196,12 @@ All shared parser code lives in `Common/`. Per-project UI fillers live in their 
 | `ODSWriter.Save(wb, file)` / `.ToMemoryBlock(wb)` | Module functions | Serialize the workbook model to .ods (mimetype first + stored; format codes → `<number:*-style>` trees) |
 | `SpreadsheetZipWriter` | Class | In-memory zip builder used by both writers: raw deflate from `MemoryBlock.Compress` (wrapper stripped), own CRC-32, ordered entries with per-entry stored control |
 | `XLSXWorkbook` | Class | Owns sheets, shared strings, styles. The shared model for both formats, read and write. |
-| `XLSXSheet` | Class | One sheet's cells + merged ranges, plus mutation: `PutCell`, `AddMergedRange`, `AppendRow/RemoveLastRow/AppendColumn/RemoveLastColumn` |
-| `XLSXCell` | Class | One cell + lazy `DisplayText(styles)`; `FormatCode` (direct format, wins over `StyleIndex`) |
+| `XLSXSheet` | Class | One sheet's cells + merged ranges + Excel Tables, plus mutation: `PutCell`, `AddMergedRange`, `AppendRow/…`. `EffectiveStyle(row, col)` folds table styling into a cell's resolved style |
+| `XLSXCell` | Class | One cell + lazy `DisplayText(styles)`; `FormatCode` (direct format); `ResolvedStyle(styles)` / `CellStyle` (visual style) |
+| `XLSXCellStyle` | Class | Whole-cell visual style: font (bold/italic/underline/name/size/color), fill background, alignment, per-edge borders |
 | `XLSXCellRange` | Class | Inclusive 1-based row/col range |
-| `XLSXStyles` | Class | Parses `xl/styles.xml`; `NumberFormatCodeAt(xfIndex)` |
+| `XLSXTable` | Class | An Excel Table (ListObject) overlaid on a sheet: range, header/totals counts, built-in style name + banding flags |
+| `XLSXStyles` | Class | Parses `xl/styles.xml` + `xl/theme/theme1.xml`; `NumberFormatCodeAt(xfIndex)` + `CellStyleAt(xfIndex)`; resolves theme/indexed colours; `TableStyleCell(name, isHeader, striped)` for table styling |
 | `XLSXFormatter` | Module | `Format(rawValue, cellType, formatCode)`; `ExcelSerialToDateTime(d)` / `DateTimeToExcelSerial(dt)`; `IsDateFormatCode(s)` |
 | `XLSXCellRef` | Module | A1 ↔ row/col helpers |
 | `XLSXZip` | Class | Zip reading — Memory backend (zip directory + `MemoryBlock.Decompress`) or Disk (`FolderItem.Unzip` into a temp folder) |
@@ -174,12 +214,14 @@ All shared parser code lives in `Common/`. Per-project UI fillers live in their 
 
 | Symbol | Project | Purpose |
 |---|---|---|
-| `XLSXDesktopListboxFiller.Fill(lb, sheet, styles [, showAllCells])` | Desktop | Pours a sheet into a `DesktopListBox`. Auto-sizes columns. |
-| `XLSXWebListboxFiller.Fill(lb, sheet, styles [, showAllCells])` | Web | Pours a sheet into a `WebListBox`. |
+| `XLSXDesktopListboxFiller.Fill(lb, sheet, styles [, showAllCells] [, showFormulas])` | Desktop | Pours a sheet into a `DesktopListBox`. Auto-sizes columns. `showFormulas` renders `=…` for formula cells. |
+| `XLSXWebListboxFiller.Fill(lb, sheet, styles [, showAllCells] [, showFormulas])` | Web | Pours a sheet into a `WebListBox`. `showFormulas` renders `=…` for formula cells. |
 
 Both fillers have two display modes:
-- **Viewing** (default): first non-empty row (probed up to row 50) becomes the listbox header; rows where every cell renders empty are skipped; merged-cell followers render blank so values don't appear duplicated.
+- **Viewing** (default): the first non-empty row (probed up to row 50) becomes the listbox header **only when it is plain** — a *styled* first row (a designed/table header) is instead shown as the first data row with A/B/C column-letter headers (`PromotesHeader`), so its fill/font renders natively on Desktop *and* Web (the Web header bar can't be styled). Only **trailing** empty rows are trimmed (`LastContentRow`); interior empty rows are kept so the grid matches the file. Merged-cell followers render blank so values don't appear duplicated.
 - **Grid** (`showAllCells = True`): column letters (A, B, C…) as headers and *every* row shown — used when editing or building a sheet from scratch. Each listbox row is tagged with its sheet row (`RowTagAt` on Desktop, `CellTagAt(row, 0)` on Web) so cell edits map back to the model.
+
+Both fillers resolve each cell's style through `XLSXSheet.EffectiveStyle(row, col)`, so explicit cell styles, theme colours, and Excel-Table styling all flow through the same Desktop paint events / Web `WebListBoxStyleRenderer`.
 
 ---
 
@@ -234,7 +276,7 @@ Design notes:
 - **XLSX**: emits `[Content_Types].xml`, `_rels/.rels`, `xl/workbook.xml` (+ rels), `xl/styles.xml`, and one `xl/worksheets/sheetN.xml` per sheet. Strings are written **inline** (`t="inlineStr"`, no sharedStrings table). Every distinct format code in the workbook becomes a custom `numFmt` (id 164+) and a `cellXf`. Merged ranges emit `<mergeCells>`. Sheets declare `<dimension>` + `<sheetFormatPr defaultRowHeight="15">` so minimal renderers (macOS Quick Look) size rows correctly.
 - **ODS**: emits `mimetype` **first and stored** (per the ODF packaging spec), `META-INF/manifest.xml`, and `content.xml`. Format codes are converted **back** into `<number:*-style>` element trees — the exact inverse of what `ODSReader` parses (date/time tokenizing with month-vs-minutes disambiguation, percentage, currency `[$SYM-…]` tags, plain numbers with decimals + grouping). Dates serialize as ISO strings, sub-day times as `PTnHnMnS` durations; merges as span attributes + `<table:covered-table-cell>`.
 - **Zip container**: both writers assemble through `SpreadsheetZipWriter` — a pure-Xojo in-memory zip builder. Raw deflate is obtained by stripping the gzip/zlib wrapper off `MemoryBlock.Compress` output (entries store uncompressed when that fails or doesn't shrink); CRC-32 is computed in-class (the framework has none); entries are written in `AddPart` order with per-entry stored control. No disk staging, no zip64.
-- **What writing preserves**: values, types, dates/times, booleans, number-format codes (the supported subset), merged ranges, sheet names. **Not preserved**: formula text (cached value is written), cell colors/fonts/borders, charts, images, conditional formatting — none of these exist in the model.
+- **What writing preserves**: values, types, dates/times, booleans, number-format codes (the supported subset), merged ranges, sheet names, whole-cell styling (fonts/fills/alignment/borders), column widths/row heights, and **formula text** (XLSX `<f>`; ODS `table:formula`). **Not preserved**: charts, images, conditional formatting, rich text — none of these exist in the model.
 
 ### `SpreadsheetZipWriter` (Class)
 
@@ -259,6 +301,8 @@ Public Function SheetCount() As Integer
 Public Function SheetAt(index As Integer) As XLSXSheet      ' 1-based; Nil out-of-range
 Public Function SheetByName(name As String) As XLSXSheet    ' Nil if not found
 Public Function SheetNames() As String()
+Public Sub AddSheet(sheet As XLSXSheet)                     ' append a pre-built sheet
+Public Function AddSheet(name As String) As XLSXSheet       ' create + append an empty sheet, return it
 ```
 
 ### `XLSXSheet` (Class)
@@ -269,9 +313,28 @@ Public Property TabIndex As Integer                          ' 1-based
 Public Function RowCount() As Integer
 Public Function ColCount() As Integer
 Public Function CellAt(row As Integer, col As Integer) As XLSXCell    ' 1-based; never Nil
+
+' Fluent authoring — indexed accessor + placers (each Put* returns the placed cell):
+Public Function Cell(row As Integer, col As Integer) As XLSXCell             ' getter: ws.Cell(r,c)
+Public Sub Cell(row As Integer, col As Integer, Assigns c As XLSXCell)       ' setter: ws.Cell(r,c) = cell
+Public Function PutText(row, col As Integer, text As String) As XLSXCell
+Public Function PutNumber(row, col As Integer, value As Double) As XLSXCell
+Public Function PutMoney(row, col As Integer, value As Double) As XLSXCell
+Public Function PutDate(row, col As Integer, dt As DateTime) As XLSXCell
+Public Function PutDateTime(row, col As Integer, dt As DateTime) As XLSXCell
+Public Function PutBool(row, col As Integer, value As Boolean) As XLSXCell
+Public Function PutFormula(row, col As Integer, formula As String) As XLSXCell     ' R1C1
+Public Function PutFormulaA1(row, col As Integer, formula As String) As XLSXCell   ' A1
+
 Public Function MergedRangeCount() As Integer
 Public Function MergedRangeAt(i As Integer) As XLSXCellRange
 Public Function IsCellMergedFollower(row As Integer, col As Integer) As Boolean
+
+' Excel Tables + the style used to render a cell:
+Public Sub AddTable(t As XLSXTable)
+Public Function TableCount() As Integer
+Public Function TableAt(i As Integer) As XLSXTable               ' Nil if out of range
+Public Function EffectiveStyle(row As Integer, col As Integer) As XLSXCellStyle   ' never Nil
 
 ' Mutation (editing / building):
 Public Sub Constructor(name As String, tabIndex As Integer)   ' empty sheet, no XML parsing
@@ -281,7 +344,17 @@ Public Sub AppendRow()                                        ' +1 empty row at 
 Public Sub RemoveLastRow()                                    ' drops cells + shrinks extent
 Public Sub AppendColumn()
 Public Sub RemoveLastColumn()
+
+' Column widths / row heights (canonical unit = points; 0 = sheet default):
+Public Function ColumnWidth(col As Integer) As Double
+Public Sub SetColumnWidth(col As Integer, widthPoints As Double)
+Public Function RowHeight(row As Integer) As Double
+Public Sub SetRowHeight(row As Integer, heightPoints As Double)
+Public Function HasColumnWidths() As Boolean
+Public Function HasRowHeights() As Boolean
 ```
+
+Column widths and row heights are read from the source (XLSX `<cols>` + row `ht`; ODS column/row styles), preserved in the model, and written back by both serializers — so layout survives a round-trip and cross-format conversion. Widths are stored in **points**; `XLSXHelpers` provides the conversions (`ColumnCharsToPoints`/`ColumnPointsToChars` for Excel's character units, `OdsLengthToPoints`/`PointsToOdsLength` for ODS cm/in/pt/…). The Desktop/Web listboxes apply column widths; per-row heights aren't supported by either control, so row heights are preserve-only (not rendered per-row).
 
 `CellAt` returns a shared empty sentinel for absent cells — no nil-check required at call sites. The empty constructor + `PutCell`/`AddMergedRange` are how `ODSReader` (and any non-XLSX source) populates the model; the row/col operations back the UI's structure buttons.
 
@@ -292,14 +365,56 @@ Public Property eType As XLSXEnums.eCellType
 Public Property RawString As String
 Public Property StyleIndex As Integer                 ' -1 if absent
 Public Property FormatCode As String                  ' direct format code; wins over StyleIndex
+Public Property Formula As String                     ' formula text without the leading "="
+Public Property FormulaIsR1C1 As Boolean              ' True → convert to A1 on write (authored R1C1)
 Public Function IsEmpty() As Boolean
+Public Function HasFormula() As Boolean               ' FormulaCached with non-empty Formula
+Public Function FormulaText() As String               ' "=<Formula>" for display, else ""
 Public Function NumberValue() As Double
 Public Function DateValue() As DateTime               ' Nil unless eType=DateValue
 Public Function BooleanValue() As Boolean
 Public Function DisplayText(styles As XLSXStyles) As String   ' lazy + cached
+
+' Fluent authoring — Shared factories (each returns a new XLSXCell):
+Shared Function TextCell(text As String) As XLSXCell
+Shared Function NumberCell(value As Double) As XLSXCell
+Shared Function MoneyCell(value As Double) As XLSXCell          ' number + "#,##0.00"
+Shared Function DateCell(dt As DateTime) As XLSXCell            ' serial + "yyyy-mm-dd"
+Shared Function DateTimeCell(dt As DateTime) As XLSXCell        ' serial + "yyyy-mm-dd hh:mm"
+Shared Function BoolCell(value As Boolean) As XLSXCell
+Shared Function FormulaCell(formula As String) As XLSXCell      ' R1C1 (converted to A1 on write)
+Shared Function FormulaCellA1(formula As String) As XLSXCell    ' A1 verbatim
+
+' Fluent style mutators — each sets an aspect and returns Me for chaining:
+Function Bold(on As Boolean = True) As XLSXCell
+Function Italic(on As Boolean = True) As XLSXCell
+Function Underline(on As Boolean = True) As XLSXCell
+Function Format(code As String) As XLSXCell            ' number format code
+Function Money() As XLSXCell                           ' "#,##0.00"
+Function Align(h As XLSXEnums.eAlignH) As XLSXCell
+Function BackColor(c As Color) As XLSXCell
+Function FontColor(c As Color) As XLSXCell
+Function FontFace(name As String) As XLSXCell
+Function FontSize(points As Double) As XLSXCell
 ```
 
 `DisplayText` upgrades a numeric cell whose style carries a date format code to `DateValue` formatting (so `44621` with style `dd/mm/yyyy` displays the date, not the serial). `FormatCode` is how ODS-loaded and user-edited cells carry their format without an `XLSXStyles` entry; when non-empty it takes precedence over the `StyleIndex` lookup.
+
+**Formulas.** A formula cell keeps its formula text in `Formula` (read from the file in A1 notation; authored via the factories). `DisplayText` still returns the cached **value**; the UIs show the formula via `FormulaText` only when their **Show formulas** toggle is on. On write the formula is re-emitted — so formulas survive a save/reopen. Authored formulas may use Excel **R1C1 relative** notation (`FormulaCell` / `FormulaIsR1C1 = True`), converted to A1 at write time anchored at the cell (see `XLSXHelpers.FormulaToA1`); `FormulaCellA1` stores A1 verbatim.
+
+**Fluent authoring example** (mirrors a "totals" sheet — see also `XLSXSheet.Put*` and `XLSXWorkbook.AddSheet`):
+
+```xojo
+Var wb As New XLSXWorkbook("Devis.xlsx")
+Var ws As XLSXSheet = wb.AddSheet("Devis")
+ws.PutText(1, 1, "Produit").Bold
+ws.PutText(1, 4, "Total HT").Bold
+ws.PutNumber(2, 2, 10)                                   ' Qté
+ws.PutMoney(2, 3, 2.5)                                   ' PU
+ws.PutFormula(2, 4, "RC[-2]*RC[-1]").Money               ' = B2*C2
+ws.PutFormula(7, 4, "SUM(R[-5]C:R[-1]C)").Money.Bold     ' = SUM(D2:D6)
+SpreadsheetWriter.Save(wb, outFile)
+```
 
 ### `XLSXHelpers` (Module) — beyond the enum helpers
 
@@ -312,6 +427,57 @@ Public Function IsNumericString(s As String) As Boolean
 ```
 
 `NewWorkbook` builds an empty workbook (one sheet, rows×cols grid) for the "New" buttons. `EffectiveFormatCode` mirrors `DisplayText`'s resolution order; `WriteFormatCode` adds default ISO date codes for date cells with no explicit code (used by both writers). `IsNumericString` types user-edited cell text.
+
+### `XLSXCellStyle` (Class) — whole-cell visual style
+
+```xojo
+Public Property Bold, Italic, Underline As Boolean
+Public Property FontName As String
+Public Property FontSize As Double          ' points, 0 = default
+Public Property FontColor As Color          ' valid when HasFontColor
+Public Property HasFontColor As Boolean
+Public Property BackgroundColor As Color    ' valid when HasBackground
+Public Property HasBackground As Boolean
+Public Property AlignH As XLSXEnums.eAlignH
+Public Property AlignV As XLSXEnums.eAlignV
+Public Property WrapText As Boolean
+Public Property BorderLeft/Right/Top/Bottom As XLSXEnums.eBorderStyle
+Public Property BorderColor As Color        ' single colour for the cell's edges
+Public Property HasBorderColor As Boolean
+Public Function IsDefault() As Boolean      ' nothing set
+Public Function HasAnyBorder() As Boolean
+```
+
+- **Read:** `XLSXStyles` parses `<fonts>` / `<fills>` (solid `fgColor`) / `<borders>` and assembles one `XLSXCellStyle` per `<cellXfs><xf>` (font + fill + border by id + `<alignment>`). Colours resolve from `rgb` (`AARRGGBB`/`RRGGBB`), **theme** (`theme="N"` + optional `tint`, via the `theme1.xml` palette with the Excel dk/lt index swap and the HSL tint algorithm), and the legacy **indexed** palette. Get a cell's style with `cell.ResolvedStyle(wb.Styles)` — a directly-set `cell.CellStyle` wins (for ODS/edited cells), else the `StyleIndex` → `XLSXStyles.CellStyleAt` lookup. Never Nil. To include Excel-Table styling, go through `XLSXSheet.EffectiveStyle(row, col)` (explicit cell style wins; otherwise the enclosing table's header/banded-row style applies unless the cell brings its own background).
+- **Render (Desktop):** the filler stashes each cell's `EffectiveStyle` in the cell tag; `MainWindow.PaintCellBackground` draws fill + borders and `PaintCellText` draws font + horizontal alignment. A styled first row is rendered as a normal data row (see Viewing mode), so there is no styled header bar to paint.
+- **Render (Web):** the filler attaches a `WebListBoxStyleRenderer(WebStyle, text)` per styled cell (fill, text colour, bold/italic/underline, font name/size, uniform border). `WebStyle` has no alignment, so numeric right-align isn't reproduced on the Web.
+- **Write (XLSX):** `XLSXWriter.BuildStyleTables` walks every cell, dedups fonts/fills/borders/numFmts, and emits one `<xf>` per distinct appearance (keyed by a style signature), so styling round-trips through a save.
+- **Write (ODS):** `ODSWriter` emits each cell style as a `<style:style>` with `<style:table-cell-properties>` (fill, per-edge borders, vertical align, wrap), `<style:paragraph-properties>` (horizontal align) and `<style:text-properties>` (font weight/style/underline/colour/size/family), keyed by the same appearance signature.
+- **Excel Tables:** `XLSXStyles.TableStyleCell(styleName, isHeader, striped)` turns a built-in table style name (e.g. `TableStyleLight9`) into a synthetic style — header = solid accent fill + white bold, striped body row = light accent tint — with the accent derived from the style-name number (groups of seven) resolved against the theme. `XLSXSheet.EffectiveStyle` applies it; the reader parses `xl/tables/*.xml` into `XLSXTable`s. *Render-only — table styling is not re-emitted on Save.*
+- **Not yet:** rich text (per-run formatting within one cell), ODS style **read**, Excel Table **write**, Web cell alignment.
+
+### `XLSXTable` (Class) — Excel Table overlay
+
+```xojo
+Public Sub Constructor(name As String, firstRow, firstCol, lastRow, lastCol As Integer)
+Public Property Name As String
+Public Property FirstRow / FirstCol / LastRow / LastCol As Integer   ' 1-based, inclusive
+Public Property HeaderRowCount As Integer = 1
+Public Property TotalsRowCount As Integer = 0
+Public Property StyleName As String                                  ' e.g. "TableStyleLight9"
+Public Property ShowRowStripes / ShowColumnStripes As Boolean
+Public Property ShowFirstColumn / ShowLastColumn As Boolean
+Public Function Contains(row, col As Integer) As Boolean
+Public Function IsHeaderRow(row As Integer) As Boolean
+Public Function IsTotalsRow(row As Integer) As Boolean
+Public Function FirstDataRow() As Integer
+```
+
+`XLSXReader` parses each worksheet's `<tableParts>` (resolved through the worksheet rels → `xl/tables/tableN.xml`) into `XLSXTable`s attached to the sheet via `AddTable`. The visual styling a table implies isn't stored per cell — it's generated from `StyleName` + the workbook theme at render time by `XLSXStyles.TableStyleCell` and applied through `XLSXSheet.EffectiveStyle`. Parsing never fails an open (a malformed table part is silently skipped). Render-only: tables aren't re-emitted on Save.
+
+### `XLSXEnums.eAlignH` / `eAlignV` / `eBorderStyle`
+
+`eAlignH`: General / Left / Center / Right. `eAlignV`: Bottom / Top / Middle. `eBorderStyle`: None / Thin / Medium / Thick (Excel's finer styles collapse to the nearest).
 
 ### `XLSXEnums.eCellType`
 
@@ -384,13 +550,13 @@ Unknown codes fall back to `Double.ToString` for numbers or `DateTime.SQLDateTim
 
 ## Limitations
 
-- Cell **values** only — colors, fonts, borders, conditional formatting, theme/palette are ignored (reading and writing).
-- Formulas show their **cached** value; we do not evaluate formulas, and saving writes the cached value (formula text is not kept in the model).
+- **Whole-cell styling** (font / fill / alignment / border) is read (RGB + theme/tint + indexed colours), rendered on Desktop **and** Web, and written for XLSX **and** ODS. **Excel Tables** (ListObjects) are parsed and their built-in style is rendered (header fill + banded rows) on both platforms. Still out: **rich text** (per-run formatting within one cell), **ODS** style **read**, Excel Table **write** (re-emit the table overlay on Save), **Web** cell alignment, and conditional formatting.
+- Formula **text** is preserved (read + written, for `.xlsx` and `.ods`) and shown on demand via the **Show formulas** toggle; the grid otherwise shows the **cached** value. We do **not** evaluate formulas — a freshly authored formula has no cached value until Excel/LibreOffice recomputes it on open.
 - No images, charts, pivots.
 - No encrypted workbooks (CompoundDoc-wrapped XLSX would currently surface as `NotAZip`).
 - No virtual / lazy listbox painting; suited to ~10k rows × ~50 cols per sheet. Larger workbooks may load slowly because every sheet is parsed eagerly during `Open`.
 - `XLSXFormatter` covers a pragmatic format-code subset (see above); ODS writing converts that same subset back to `<number:*-style>` trees — codes outside it save as unstyled values.
-- Frozen panes and column widths from the source workbook are **not** preserved in the listbox display.
+- Column widths from the source workbook **are** preserved (model + both serializers) and applied to the listbox; per-row heights are preserve-only (neither listbox renders per-row heights). Frozen panes are **not** preserved.
 
 ---
 
@@ -400,13 +566,15 @@ Unknown codes fall back to `Double.ToString` for numbers or `DateTime.SQLDateTim
 |---|---|
 | `test_files/excelize-book1.xlsx` | 2 sheets, basic smoke |
 | `test_files/excelize-sharedstrings.xlsx` | shared-strings table |
-| `test_files/excelize-calcchain.xlsx` | formulas with cached values |
+| `test_files/excelize-calcchain.xlsx` | formulas with cached values (single row) |
+| `test_files/formulas-sample.xlsx` | multi-row "Devis" with headers + 12 formulas (`*`, `SUM`, `AVERAGE`, `MAX`, `COUNT`) — exercises formula read/write and the Show-formulas toggle |
 | `test_files/sheetjs-cdn-pres.xlsx` | small typical workbook |
 | `test_files/microsoft-financial-sample.xlsx` | real-world workbook — accounting/currency formats, dates, ~700 rows |
 | `test_files/ods-multi-sheet.ods` | ODS multi-sheet smoke |
 | `test_files/ods-types.ods` | every ODS value type — string / float / date / time / date-time / boolean |
 | `test_files/ods-sales.ods` | wider numeric grid |
 | `test_files/ods-styled.ods` | `<number:*-style>` → format-code conversion (currency, number, percentage, date) + a merged cell |
+| `test_files/formulas-sample.ods` | ODS `table:formula="of:=…"` (SUM/AVERAGE/MAX/COUNT + arithmetic) — exercises ODS formula read |
 
 When opening any of the test fixtures, you should see:
 - The window/page title becomes `VNS XLSX Reader — <filename> [<sheet count>]`.

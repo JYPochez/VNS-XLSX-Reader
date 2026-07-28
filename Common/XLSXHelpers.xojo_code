@@ -127,6 +127,74 @@ Protected Module XLSXHelpers
 		End Function
 	#tag EndMethod
 
+	#tag Method, Flags = &h0, Description = 436F6E7665727420616E20457863656C20636F6C756D6E207769647468202864656661756C742D666F6E742063686172616374657220756E6974732920746F20706F696E74732028746865206D6F64656C27732063616E6F6E6963616C20636F6C756D6E2D776964746820756E6974292E0A
+		Function ColumnCharsToPoints(chars As Double) As Double
+		  ' Excel column width is measured in the default font's "max digit width"
+		  ' (~7px for Calibri 11) + 5px cell padding; 1px = 0.75pt at 96 DPI.
+		  ' Canonical column-width unit in the model is points.
+		  If chars <= 0 Then Return 0.0
+		  Return ((chars * 7.0) + 5.0) * 0.75
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 496E7665727365206F6620436F6C756D6E4368617273546F506F696E74732C20666F722077726974696E6720584C5358203C636F6C2077696474683D222E2E2E223E2E0A
+		Function ColumnPointsToChars(points As Double) As Double
+		  ' Inverse of ColumnCharsToPoints, for writing XLSX <col width="…">.
+		  If points <= 0 Then Return 0.0
+		  Var px As Double = points / 0.75
+		  Var chars As Double = (px - 5.0) / 7.0
+		  If chars < 0 Then Return 0.0
+		  Return chars
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 506172736520616E204F4453206C656E6774682028636D2F6D6D2F696E2F70742F70632F70782920746F20706F696E74733B20756E6B6E6F776E2F6D697373696E6720756E6974207472656174656420617320706F696E74732E0A
+		Function OdsLengthToPoints(s As String) As Double
+		  ' Parse an ODS length ("2.5cm", "1.2in", "30pt", "15mm", "1pc", "64px")
+		  ' into points. Unknown / missing unit is treated as points.
+		  Var t As String = s.Trim.Lowercase
+		  If t = "" Then Return 0.0
+		  Var num As String = ""
+		  Var unit As String = ""
+		  For i As Integer = 0 To t.Length - 1
+		    Var ch As String = t.Middle(i, 1)
+		    Var c As Integer = Asc(ch)
+		    If (c >= 48 And c <= 57) Or ch = "." Or ch = "-" Or ch = "+" Then
+		      num = num + ch
+		    Else
+		      unit = t.Middle(i)
+		      Exit
+		    End If
+		  Next
+		  Var v As Double = num.ToDouble
+		  Select Case unit
+		  Case "cm"
+		    Return v * 28.3464567
+		  Case "mm"
+		    Return v * 2.83464567
+		  Case "in"
+		    Return v * 72.0
+		  Case "pc"
+		    Return v * 12.0
+		  Case "px"
+		    Return v * 0.75
+		  Else
+		    Return v   ' "pt" or unspecified
+		  End Select
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 466F726D617420706F696E747320617320616E204F4453206C656E67746820737472696E6720696E2063656E74696D657472657320284C696272654F666669636527732070726566657272656420756E6974292E0A
+		Function PointsToOdsLength(points As Double) As String
+		  ' Emit an ODS length in centimetres (LibreOffice's preferred unit),
+		  ' rounded to 4 decimals. Empty string for non-positive input.
+		  If points <= 0 Then Return ""
+		  Var cm As Double = points / 28.3464567
+		  Var r As Double = Round(cm * 10000.0) / 10000.0
+		  Return Str(r) + "cm"
+		End Function
+	#tag EndMethod
+
 	#tag Method, Flags = &h0, Description = 45736361706520746865206669766520584D4C2D73656E736974697665206368617261637465727320666F7220656C656D656E74207465787420616E6420646F75626C652D71756F746564206174747269627574652076616C7565732E0A
 		Function XmlEscape(s As String) As String
 		  ' Escape the five XML-sensitive characters for use in element text and
@@ -207,6 +275,167 @@ Protected Module XLSXHelpers
 		  ' Must end on a digit ("3.", "1e", "1e+" are rejected).
 		  Var lastC As Integer = Asc(t.Middle(n - 1, 1))
 		  Return seenDigit And lastC >= 48 And lastC <= 57
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function FormulaToA1(formula As String, curRow As Integer, curCol As Integer) As String
+		  ' Convert a formula written in Excel R1C1 relative notation into A1 notation,
+		  ' anchored at (curRow, curCol). Only R1C1 reference tokens are rewritten; the
+		  ' rest of the formula (functions, operators, literals) is copied verbatim.
+		  ' Examples at (1,6): SUM(R[+3]C:R[+1000]C) -> SUM(F4:F1001); RC[-2] -> H1.
+		  If formula = "" Then Return ""
+		  Var re As New RegEx
+		  re.SearchPattern = "(?<![A-Za-z0-9_.])R(\[[+-]?\d+\]|\d+)?C(\[[+-]?\d+\]|\d+)?(?![A-Za-z0-9_(])"
+		  Var opts As New RegExOptions
+		  opts.CaseSensitive = True   ' R1C1 tokens are uppercase R / C
+		  re.Options = opts
+		  Var result As String
+		  Var cursor As Integer = 0   ' 0-based char index into formula
+		  Var match As RegExMatch = re.Search(formula)
+		  While match <> Nil
+		    ' Whole-match start byte offset -> 0-based char index (for String.Middle).
+		    Var startIdx As Integer = formula.LeftBytes(match.SubExpressionStartB(0)).Length
+		    Var whole As String = match.SubExpressionString(0)
+		    result = result + formula.Middle(cursor, startIdx - cursor)
+		    result = result + R1C1RefToA1(SubExprOrEmpty(match, 1), SubExprOrEmpty(match, 2), curRow, curCol)
+		    cursor = startIdx + whole.Length
+		    match = re.Search   ' continue from the last match position
+		  Wend
+		  result = result + formula.Middle(cursor)
+		  Return result
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function R1C1RefToA1(rPart As String, cPart As String, curRow As Integer, curCol As Integer) As String
+		  ' Build one A1 reference from the R (row) and C (column) capture groups.
+		  ' An empty group is the current row/col; [n] is a relative offset; a bare
+		  ' number is an absolute index (emitted with a $ prefix).
+		  Var rowAbs As Boolean
+		  Var colAbs As Boolean
+		  Var row As Integer = ResolveR1C1Index(rPart, curRow, rowAbs)
+		  Var col As Integer = ResolveR1C1Index(cPart, curCol, colAbs)
+		  If row < 1 Then row = 1
+		  If col < 1 Then col = 1
+		  Var s As String
+		  If colAbs Then s = s + "$"
+		  s = s + XLSXCellRef.IndexToColLetters(col)
+		  If rowAbs Then s = s + "$"
+		  s = s + Str(row)
+		  Return s
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function ResolveR1C1Index(part As String, current As Integer, ByRef isAbsolute As Boolean) As Integer
+		  ' Resolve one R1C1 index component against the current row/col.
+		  isAbsolute = False
+		  If part = "" Then Return current              ' bare R or C -> current
+		  If part.Left(1) = "[" Then                    ' [+n] / [-n] -> relative
+		    Var inner As String = part.Middle(1, part.Length - 2)
+		    If inner.Left(1) = "+" Then inner = inner.Middle(1)
+		    Return current + inner.ToInteger
+		  End If
+		  isAbsolute = True                              ' digits only -> absolute
+		  Return part.ToInteger
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function A1ToOdfFormula(a1 As String) As String
+		  ' Convert an A1-notation formula into ODF (OpenFormula) form for a .ods
+		  ' table:formula attribute: cell/range refs wrapped as [.A1] / [.A1:.B2]
+		  ' (sheet-qualified Sheet!A1 -> [Sheet.A1]), the whole prefixed with of:=.
+		  ' Inverse of OdfFormulaToA1. String literals and operators are copied as-is.
+		  If a1 = "" Then Return ""
+		  Var re As New RegEx
+		  re.SearchPattern = "(?<![A-Za-z0-9_.$!])(?:('[^']+'|[A-Za-z_][A-Za-z0-9_.]*)!)?(\$?[A-Za-z]{1,3}\$?[0-9]+)(?::(\$?[A-Za-z]{1,3}\$?[0-9]+))?(?![A-Za-z0-9_(])"
+		  Var opts As New RegExOptions
+		  opts.CaseSensitive = True
+		  re.Options = opts
+		  Var result As String
+		  Var cursor As Integer = 0
+		  Var match As RegExMatch = re.Search(a1)
+		  While match <> Nil
+		    Var startIdx As Integer = a1.LeftBytes(match.SubExpressionStartB(0)).Length
+		    Var whole As String = match.SubExpressionString(0)
+		    result = result + a1.Middle(cursor, startIdx - cursor)
+		    Var sheet As String = SubExprOrEmpty(match, 1)
+		    Var c1 As String = SubExprOrEmpty(match, 2)
+		    Var c2 As String = SubExprOrEmpty(match, 3)
+		    Var head As String = If(sheet <> "", "[" + sheet + ".", "[.")
+		    If c2 <> "" Then
+		      result = result + head + c1 + ":." + c2 + "]"
+		    Else
+		      result = result + head + c1 + "]"
+		    End If
+		    cursor = startIdx + whole.Length
+		    match = re.Search
+		  Wend
+		  result = result + a1.Middle(cursor)
+		  Return "of:=" + result
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function OdfFormulaToA1(odf As String) As String
+		  ' Convert a .ods table:formula (ODF/OpenFormula) back into A1 notation:
+		  ' strip the of:= / oooc:= / = prefix and unwrap [.A1] / [Sheet.A1] refs.
+		  ' Inverse of A1ToOdfFormula.
+		  Var s As String = odf
+		  If s.Left(4) = "of:=" Then
+		    s = s.Middle(4)
+		  ElseIf s.Left(6) = "oooc:=" Then
+		    s = s.Middle(6)
+		  ElseIf s.Left(1) = "=" Then
+		    s = s.Middle(1)
+		  End If
+		  Var re As New RegEx
+		  re.SearchPattern = "\[([^\]]+)\]"
+		  Var result As String
+		  Var cursor As Integer = 0
+		  Var match As RegExMatch = re.Search(s)
+		  While match <> Nil
+		    Var startIdx As Integer = s.LeftBytes(match.SubExpressionStartB(0)).Length
+		    Var whole As String = match.SubExpressionString(0)
+		    result = result + s.Middle(cursor, startIdx - cursor)
+		    result = result + OdfRefInnerToA1(SubExprOrEmpty(match, 1))
+		    cursor = startIdx + whole.Length
+		    match = re.Search
+		  Wend
+		  result = result + s.Middle(cursor)
+		  Return result
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function OdfRefInnerToA1(inner As String) As String
+		  ' Convert the inside of one ODF [ ... ] reference to A1. Same-sheet parts
+		  ' start with '.' (dropped); a Sheet.cell part becomes Sheet!cell.
+		  Var parts() As String = inner.Split(":")
+		  Var outs() As String
+		  For Each pp As String In parts
+		    If pp.Left(1) = "." Then
+		      outs.Add pp.Middle(1)
+		    ElseIf pp.IndexOf(".") >= 0 Then
+		      Var dot As Integer = pp.IndexOf(".")
+		      outs.Add pp.Left(dot) + "!" + pp.Middle(dot + 1)
+		    Else
+		      outs.Add pp
+		    End If
+		  Next
+		  Return String.FromArray(outs, ":")
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function SubExprOrEmpty(match As RegExMatch, index As Integer) As String
+		  ' RegExMatch.SubExpressionString raises OutOfBoundsException for an optional
+		  ' capture group that didn't participate (index >= SubExpressionCount). This
+		  ' returns "" instead, matching the behaviour the converters assume.
+		  If match.SubExpressionCount > index Then Return match.SubExpressionString(index)
+		  Return ""
 		End Function
 	#tag EndMethod
 

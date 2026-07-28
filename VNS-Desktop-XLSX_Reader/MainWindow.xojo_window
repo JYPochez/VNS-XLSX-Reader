@@ -118,6 +118,68 @@ Begin DesktopWindow MainWindow
       VisualState     =   1
       Width           =   160
    End
+   Begin DesktopCheckBox CheckboxShowFormulas
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Caption         =   "#strings.kStrShowFormulas"
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   20
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   272
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      Scope           =   0
+      State           =   0
+      TabIndex        =   2
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   12
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Value           =   False
+      VisualState     =   0
+      Width           =   170
+   End
+   Begin DesktopButton ButtonGenCode
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrGenCode"
+      Default         =   False
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   460
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   3
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   8
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   110
+   End
    Begin DesktopLabel LabelParseTime
       AllowAutoDeactivate=   True
       Bold            =   False
@@ -414,7 +476,63 @@ End
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Or idx >= mWorkbook.SheetCount Then Return
 		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
-		  XLSXDesktopListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles, mShowAllCells)
+		  XLSXDesktopListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles, mShowAllCells, CheckboxShowFormulas.Value)
+		  mShownSheetIndex = idx   ' remember which sheet the listbox currently shows
+		  BuildHeaderStyles(sheet)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub GenerateCode()
+		  ' Generate ready-to-paste Xojo builder source for the current workbook
+		  ' (fluent authoring API) and save it to a .txt file the user picks.
+		  If mWorkbook Is Nil Then Return
+		  Var src As String = SpreadsheetCodeGen.Generate(mWorkbook)
+		  Var dlg As New SaveFileDialog
+		  Var t As New FileType
+		  t.Name = "Text"
+		  t.Extensions = "txt"
+		  dlg.Filter = t
+		  dlg.SuggestedFileName = "BuildWorkbook.txt"
+		  Var f As FolderItem = dlg.ShowModal(Self)
+		  If f Is Nil Then Return
+		  Var out As TextOutputStream = TextOutputStream.Create(f)
+		  out.Write src
+		  out.Close
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub BuildHeaderStyles(sheet As XLSXSheet)
+		  ' Resolve the header row's cell styles only when that row is actually
+		  ' promoted to the header bar. A promoted header is by definition unstyled
+		  ' (a styled first row is shown as a data row instead — see PromotesHeader),
+		  ' so this normally yields an empty map; the guard prevents a styled first
+		  ' row's fill from leaking onto the A/B/C header bar when it's NOT promoted.
+		  mHeaderStyles = New Dictionary
+		  If sheet Is Nil Then Return
+		  If Not XLSXDesktopListboxFiller.PromotesHeader(sheet, mWorkbook.Styles, mShowAllCells) Then Return
+		  Var hr As Integer = XLSXDesktopListboxFiller.HeaderRowIndex(sheet)
+		  If hr <= 0 Then Return
+		  For c As Integer = 1 To sheet.ColCount
+		    Var st As XLSXCellStyle = sheet.EffectiveStyle(hr, c)
+		    If st <> Nil And Not st.IsDefault Then mHeaderStyles.Value(c - 1) = st
+		  Next
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub CaptureColumnWidths(sheetIndex As Integer)
+		  ' Read the listbox's current (possibly user-resized) column widths back
+		  ' into the model so Save reflects what's on screen. WidthActual is in the
+		  ' same unit the model uses (points). Maps listbox col j -> sheet col j+1.
+		  If mWorkbook Is Nil Or sheetIndex < 0 Or sheetIndex >= mWorkbook.SheetCount Then Return
+		  Var sheet As XLSXSheet = mWorkbook.SheetAt(sheetIndex + 1)
+		  If sheet Is Nil Then Return
+		  For j As Integer = 0 To ListboxData.ColumnCount - 1
+		    Var wActual As Integer = ListboxData.ColumnAttributesAt(j).WidthActual
+		    If wActual > 0 Then sheet.SetColumnWidth(j + 1, wActual)
+		  Next
 		End Sub
 	#tag EndMethod
 
@@ -433,6 +551,7 @@ End
 		  ' shown in grid mode (all cells visible and editable).
 		  mWorkbook = XLSXHelpers.NewWorkbook(strings.kStrUntitledName, 8, 4)
 		  mShowAllCells = True
+		  mShownSheetIndex = -1   ' avoid a load-time PanelChanged capturing stale widths
 		  Self.Title = strings.kStrAppTitle + " — " + mWorkbook.SourceName
 		  LabelParseTime.Text = ""
 		  EnableEditButtons
@@ -477,6 +596,7 @@ End
 		    LabelParseTime.Text = strings.kStrParseTime + Str(totalMs) + strings.kStrParseTimeUnit _
 		      + " (zip " + Str(zipMs) + " + xml " + Str(xmlMs) + ", " + wb.OpenMode.ToString + ")"
 		    mShowAllCells = False
+		    mShownSheetIndex = -1   ' avoid a load-time PanelChanged capturing the previous file's widths
 		    EnableEditButtons
 		    RebuildTabs(wb)
 		  Catch ex As XLSXException
@@ -535,6 +655,9 @@ End
 	#tag Method, Flags = &h21
 		Private Sub SaveWorkbook()
 		  If mWorkbook Is Nil Then Return
+
+		  ' Fold any user column-resizes on the visible sheet into the model first.
+		  CaptureColumnWidths(mShownSheetIndex)
 
 		  Var dlg As New SaveFileDialog
 		  dlg.Title = strings.kStrSaveDialogTitle
@@ -628,9 +751,40 @@ End
 		End Function
 	#tag EndMethod
 
+	#tag Method, Flags = &h21
+		Private Sub DrawCellEdge(g As Graphics, style As XLSXEnums.eBorderStyle, edge As String)
+		  ' Draw one cell border edge. Thickness is faked with stacked 1px lines
+		  ' (thin=1, medium=2, thick=3) since the listbox paint Graphics has no pen size.
+		  If style = XLSXEnums.eBorderStyle.None Then Return
+		  Var w As Integer = 1
+		  If style = XLSXEnums.eBorderStyle.Medium Then w = 2
+		  If style = XLSXEnums.eBorderStyle.Thick Then w = 3
+		  For k As Integer = 0 To w - 1
+		    Select Case edge
+		    Case "top"
+		      g.DrawLine(0, k, g.Width, k)
+		    Case "bottom"
+		      g.DrawLine(0, g.Height - 1 - k, g.Width, g.Height - 1 - k)
+		    Case "left"
+		      g.DrawLine(k, 0, k, g.Height)
+		    Case "right"
+		      g.DrawLine(g.Width - 1 - k, 0, g.Width - 1 - k, g.Height)
+		    End Select
+		  Next
+		End Sub
+	#tag EndMethod
+
 
 	#tag Property, Flags = &h21
 		Private mWorkbook As XLSXWorkbook
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private mShownSheetIndex As Integer = -1
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private mHeaderStyles As Dictionary
 	#tag EndProperty
 
 	#tag Property, Flags = &h21
@@ -651,6 +805,8 @@ End
 #tag Events TabPanelSheets
 	#tag Event
 		Sub PanelChanged()
+		  ' Capture column resizes on the sheet we're leaving before re-filling.
+		  CaptureColumnWidths(mShownSheetIndex)
 		  ListboxData.PanelIndex = TabPanelSheets.SelectedPanelIndex + 1
 		  FillCurrentSheet
 		End Sub
@@ -669,6 +825,23 @@ End
 	#tag Event
 		Sub Pressed()
 		  DoNewWorkbook
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events CheckboxShowFormulas
+	#tag Event
+		Sub ValueChanged()
+		  ' Toggle between cached values and formula text; re-fill the current sheet.
+		  FillCurrentSheet
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonGenCode
+	#tag Event
+		Sub Pressed()
+		  GenerateCode
 		End Sub
 	#tag EndEvent
 #tag EndEvents
@@ -732,5 +905,121 @@ End
 		Sub CellAction(row As Integer, column As Integer)
 		  ApplyCellEdit(row, column)
 		End Sub
+	#tag EndEvent
+	#tag Event
+		Function PaintCellBackground(g As Graphics, row As Integer, column As Integer) As Boolean
+		  ' Paint a styled cell's fill and borders. The filler stashed the
+		  ' XLSXCellStyle in the cell tag; unstyled cells fall through to the default.
+		  ' This event also fires for the empty filler rows below the data, where
+		  ' CellTagAt would be out of range — bail out for those.
+		  If row < 0 Or row >= Me.RowCount Or column < 0 Or column >= Me.ColumnCount Then Return False
+		  Var st As XLSXCellStyle = Me.CellTagAt(row, column)
+		  If st Is Nil Then Return False
+		  Var hasBorder As Boolean = st.HasAnyBorder
+		  If Not st.HasBackground And Not hasBorder Then Return False
+
+		  If st.HasBackground Then
+		    g.DrawingColor = st.BackgroundColor
+		  Else
+		    g.DrawingColor = Color.RGB(255, 255, 255)   ' border-only cell needs a base fill
+		  End If
+		  g.FillRectangle(0, 0, g.Width, g.Height)
+
+		  If hasBorder Then
+		    g.DrawingColor = If(st.HasBorderColor, st.BorderColor, Color.RGB(0, 0, 0))
+		    DrawCellEdge(g, st.BorderTop, "top")
+		    DrawCellEdge(g, st.BorderBottom, "bottom")
+		    DrawCellEdge(g, st.BorderLeft, "left")
+		    DrawCellEdge(g, st.BorderRight, "right")
+		  End If
+		  Return True
+		End Function
+	#tag EndEvent
+	#tag Event
+		Function PaintCellText(g As Graphics, row As Integer, column As Integer, x As Integer, y As Integer) As Boolean
+		  ' Render font (bold/italic/underline/colour/size) and horizontal alignment
+		  ' for styled cells. Cells whose only styling is a fill fall through so the
+		  ' default text draws over the custom background. x/y are the listbox's
+		  ' suggested baseline; we keep y and recompute x for alignment.
+		  If row < 0 Or row >= Me.RowCount Or column < 0 Or column >= Me.ColumnCount Then Return False
+		  Var st As XLSXCellStyle = Me.CellTagAt(row, column)
+		  If st Is Nil Then Return False
+		  Var needsCustom As Boolean = st.Bold Or st.Italic Or st.Underline Or st.HasFontColor _
+		    Or st.FontName <> "" Or st.FontSize > 0 Or st.AlignH <> XLSXEnums.eAlignH.General
+		  If Not needsCustom Then Return False
+
+		  If st.Bold Then g.Bold = True
+		  If st.Italic Then g.Italic = True
+		  If st.Underline Then g.Underline = True
+		  If st.FontName <> "" Then g.FontName = st.FontName
+		  If st.FontSize > 0 Then g.FontSize = st.FontSize
+		  If st.HasFontColor Then g.DrawingColor = st.FontColor
+
+		  Var text As String = Me.CellTextAt(row, column)
+		  Var tw As Double = g.TextWidth(text)
+		  Var tx As Double = x   ' default: the listbox's suggested left position
+		  Select Case st.AlignH
+		  Case XLSXEnums.eAlignH.Right
+		    tx = g.Width - tw - x
+		  Case XLSXEnums.eAlignH.Center
+		    tx = (g.Width - tw) / 2.0
+		  End Select
+		  If tx < x And st.AlignH <> XLSXEnums.eAlignH.Right Then tx = x
+		  g.DrawText(text, tx, y)
+		  Return True
+		End Function
+	#tag EndEvent
+	#tag Event
+		Function PaintHeaderBackground(g As Graphics, column As Integer) As Boolean
+		  ' Style the column-header bar from the header row's cell style (viewing
+		  ' mode promotes the first row to the header, so its fill/border lives here).
+		  If mHeaderStyles Is Nil Or Not mHeaderStyles.HasKey(column) Then Return False
+		  Var st As XLSXCellStyle = mHeaderStyles.Value(column)
+		  Var hasBorder As Boolean = st.HasAnyBorder
+		  If Not st.HasBackground And Not hasBorder Then Return False
+		  g.DrawingColor = If(st.HasBackground, st.BackgroundColor, Color.RGB(255, 255, 255))
+		  g.FillRectangle(0, 0, g.Width, g.Height)
+		  If hasBorder Then
+		    g.DrawingColor = If(st.HasBorderColor, st.BorderColor, Color.RGB(0, 0, 0))
+		    DrawCellEdge(g, st.BorderTop, "top")
+		    DrawCellEdge(g, st.BorderBottom, "bottom")
+		    DrawCellEdge(g, st.BorderLeft, "left")
+		    DrawCellEdge(g, st.BorderRight, "right")
+		  End If
+		  Return True
+		End Function
+	#tag EndEvent
+	#tag Event
+		Function PaintHeaderContent(g As Graphics, column As Integer) As Boolean
+		  ' Render the header text with the header cell's font + alignment, but only
+		  ' when we're also drawing a custom fill behind it (PaintHeaderBackground).
+		  ' Applying a font colour alone — often a light colour meant for a colored
+		  ' fill we couldn't resolve — would leave faded text on the default header bar.
+		  If mHeaderStyles Is Nil Or Not mHeaderStyles.HasKey(column) Then Return False
+		  Var st As XLSXCellStyle = mHeaderStyles.Value(column)
+		  If Not st.HasBackground Then Return False
+
+		  If st.Bold Then g.Bold = True
+		  If st.Italic Then g.Italic = True
+		  If st.Underline Then g.Underline = True
+		  If st.FontName <> "" Then g.FontName = st.FontName
+		  If st.FontSize > 0 Then g.FontSize = st.FontSize
+		  If st.HasFontColor Then g.DrawingColor = st.FontColor
+
+		  Var text As String = Me.HeaderAt(column)
+		  Const kInset As Integer = 4
+		  Var tw As Double = g.TextWidth(text)
+		  Var tx As Double = kInset
+		  Select Case st.AlignH
+		  Case XLSXEnums.eAlignH.Right
+		    tx = g.Width - tw - kInset
+		  Case XLSXEnums.eAlignH.Center
+		    tx = (g.Width - tw) / 2.0
+		  End Select
+		  If tx < kInset And st.AlignH <> XLSXEnums.eAlignH.Right Then tx = kInset
+		  Var y As Double = ((g.Height - g.TextHeight) / 2.0) + g.FontAscent
+		  g.DrawText(text, tx, y)
+		  Return True
+		End Function
 	#tag EndEvent
 #tag EndEvents

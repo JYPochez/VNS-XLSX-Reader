@@ -40,11 +40,15 @@ Protected Module ODSWriter
 
 	#tag Method, Flags = &h21, Description = 456D697420636F6E74656E742E786D6C3A206175746F6D61746963207374796C6573202864617461207374796C65732066726F6D2074686520776F726B626F6F6B277320666F726D617420636F6465732920706C7573206F6E65207461626C65207065722073686565742E0A
 		Private Function ContentXml(wb As XLSXWorkbook) As String
-		  ' Collect the distinct format codes; each that converts to an ODS data
-		  ' style gets a data style N<k> and a cell style ce<k>.
-		  Var codes() As String
-		  Var codeToStyle As New Dictionary   ' format code -> cell style name
+		  ' Cell styles keyed by the full appearance (format code + visual style):
+		  ' each distinct one gets a ce<k> with an optional data-style-name (number
+		  ' format) plus table-cell / paragraph / text properties (fill, borders,
+		  ' alignment, font). Number-format data styles N<k> are deduped per code.
+		  Var sigToCe As New Dictionary       ' appearance signature -> "ce<k>"
+		  Var dataStyleForCode As New Dictionary   ' format code -> "N<k>"
 		  Var styleXml() As String
+		  Var ceCounter As Integer = 0
+		  Var dataCounter As Integer = 0
 		  For s As Integer = 1 To wb.SheetCount
 		    Var sheet As XLSXSheet = wb.SheetAt(s)
 		    For r As Integer = 1 To sheet.RowCount
@@ -52,16 +56,61 @@ Protected Module ODSWriter
 		        Var cell As XLSXCell = sheet.CellAt(r, c)
 		        If cell.IsEmpty Then Continue
 		        Var code As String = XLSXHelpers.WriteFormatCode(cell, wb.Styles)
-		        If code = "" Or codes.IndexOf(code) >= 0 Then Continue
-		        codes.Add code
-		        Var k As Integer = codes.Count
-		        Var dataXml As String = DataStyleXml(code, "N" + Str(k))
-		        If dataXml <> "" Then
-		          styleXml.Add dataXml
-		          styleXml.Add "<style:style style:name=""ce" + Str(k) + """ style:family=""table-cell"" style:data-style-name=""N" + Str(k) + """/>"
-		          codeToStyle.Value(code) = "ce" + Str(k)
+		        Var cst As XLSXCellStyle = cell.ResolvedStyle(wb.Styles)
+		        Var sig As String = CellStyleSignature(code, cst)
+		        If sig = "" Or sigToCe.HasKey(sig) Then Continue
+
+		        Var dataName As String = ""
+		        If code <> "" And code <> "General" Then
+		          If dataStyleForCode.HasKey(code) Then
+		            dataName = dataStyleForCode.Value(code)
+		          Else
+		            Var nm As String = "N" + Str(dataCounter + 1)
+		            Var dataXml As String = DataStyleXml(code, nm)
+		            If dataXml <> "" Then
+		              dataCounter = dataCounter + 1
+		              styleXml.Add dataXml
+		              dataStyleForCode.Value(code) = nm
+		              dataName = nm
+		            End If
+		          End If
 		        End If
+		        ceCounter = ceCounter + 1
+		        Var ceName As String = "ce" + Str(ceCounter)
+		        styleXml.Add CellStyleXml(ceName, dataName, cst)
+		        sigToCe.Value(sig) = ceName
 		      Next
+		    Next
+		  Next
+
+		  ' Column-width / row-height styles: one table-column / table-row style per
+		  ' distinct width / height (points), keyed by Str(points). Columns with no
+		  ' explicit width get the Excel-ish default (48 pt ≈ 64 px).
+		  Var colStyles As New Dictionary   ' Str(widthPt)  -> column style name
+		  Var rowStyles As New Dictionary   ' Str(heightPt) -> row style name
+		  Var colCounter As Integer = 0
+		  Var rowCounter As Integer = 0
+		  For s As Integer = 1 To wb.SheetCount
+		    Var sheet As XLSXSheet = wb.SheetAt(s)
+		    For c As Integer = 1 To Max(1, sheet.ColCount)   ' match TableXml's column count
+		      Var wpt As Double = sheet.ColumnWidth(c)
+		      If wpt <= 0 Then wpt = 48.0
+		      Var key As String = Str(wpt)
+		      If Not colStyles.HasKey(key) Then
+		        colCounter = colCounter + 1
+		        colStyles.Value(key) = "co" + Str(colCounter)
+		        styleXml.Add "<style:style style:name=""co" + Str(colCounter) + """ style:family=""table-column""><style:table-column-properties style:column-width=""" + XLSXHelpers.PointsToOdsLength(wpt) + """/></style:style>"
+		      End If
+		    Next
+		    For r As Integer = 1 To sheet.RowCount
+		      Var hpt As Double = sheet.RowHeight(r)
+		      If hpt <= 0 Then Continue
+		      Var key As String = Str(hpt)
+		      If Not rowStyles.HasKey(key) Then
+		        rowCounter = rowCounter + 1
+		        rowStyles.Value(key) = "ro" + Str(rowCounter)
+		        styleXml.Add "<style:style style:name=""ro" + Str(rowCounter) + """ style:family=""table-row""><style:table-row-properties style:row-height=""" + XLSXHelpers.PointsToOdsLength(hpt) + """/></style:style>"
+		      End If
 		    Next
 		  Next
 
@@ -76,14 +125,13 @@ Protected Module ODSWriter
 		    + " xmlns:fo=""urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0""" _
 		    + " office:version=""1.2"">"
 		  parts.Add "<office:automatic-styles>"
-		  parts.Add "<style:style style:name=""co1"" style:family=""table-column""><style:table-column-properties style:column-width=""3.0cm""/></style:style>"
 		  For Each sx As String In styleXml
 		    parts.Add sx
 		  Next
 		  parts.Add "</office:automatic-styles>"
 		  parts.Add "<office:body><office:spreadsheet>"
 		  For s As Integer = 1 To wb.SheetCount
-		    parts.Add TableXml(wb.SheetAt(s), wb.Styles, codeToStyle)
+		    parts.Add TableXml(wb.SheetAt(s), wb.Styles, sigToCe, colStyles, rowStyles)
 		  Next
 		  parts.Add "</office:spreadsheet></office:body>"
 		  parts.Add "</office:document-content>"
@@ -92,7 +140,7 @@ Protected Module ODSWriter
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 456D6974206F6E65207461626C653A7461626C6520E2809420726F7773206F662063656C6C73207769746820636F76657265642D7461626C652D63656C6C20666F72206D6572676520666F6C6C6F7765727320616E64207370616E2061747472696275746573206F6E206D6572676520616E63686F72732E0A
-		Private Function TableXml(sheet As XLSXSheet, styles As XLSXStyles, codeToStyle As Dictionary) As String
+		Private Function TableXml(sheet As XLSXSheet, styles As XLSXStyles, sigToCe As Dictionary, colStyles As Dictionary, rowStyles As Dictionary) As String
 		  ' Index merged-range anchors so spans can be emitted on the anchor cell.
 		  Var anchors As New Dictionary
 		  For i As Integer = 0 To sheet.MergedRangeCount - 1
@@ -103,11 +151,19 @@ Protected Module ODSWriter
 		  Var cols As Integer = Max(1, sheet.ColCount)
 		  Var parts() As String
 		  parts.Add "<table:table table:name=""" + XLSXHelpers.XmlEscape(sheet.Name) + """>"
-		  parts.Add "<table:table-column table:style-name=""co1"" table:number-columns-repeated=""" + Str(cols) + """/>"
+		  ' One <table:table-column> per column, referencing its width style.
+		  For c As Integer = 1 To cols
+		    Var wpt As Double = sheet.ColumnWidth(c)
+		    If wpt <= 0 Then wpt = 48.0
+		    parts.Add "<table:table-column table:style-name=""" + colStyles.Value(Str(wpt)).StringValue + """/>"
+		  Next
 
 		  For r As Integer = 1 To sheet.RowCount
 		    Var rowParts() As String
-		    rowParts.Add "<table:table-row>"
+		    Var rowStyleAttr As String = ""
+		    Var hpt As Double = sheet.RowHeight(r)
+		    If hpt > 0 And rowStyles.HasKey(Str(hpt)) Then rowStyleAttr = " table:style-name=""" + rowStyles.Value(Str(hpt)).StringValue + """"
+		    rowParts.Add "<table:table-row" + rowStyleAttr + ">"
 		    For c As Integer = 1 To cols
 		      If sheet.IsCellMergedFollower(r, c) Then
 		        rowParts.Add "<table:covered-table-cell/>"
@@ -126,8 +182,16 @@ Protected Module ODSWriter
 		        Continue
 		      End If
 		      Var code As String = XLSXHelpers.WriteFormatCode(cell, styles)
-		      If code <> "" And codeToStyle.HasKey(code) Then
-		        attrs = " table:style-name=""" + codeToStyle.Value(code).StringValue + """" + attrs
+		      Var sig As String = CellStyleSignature(code, cell.ResolvedStyle(styles))
+		      If sig <> "" And sigToCe.HasKey(sig) Then
+		        attrs = " table:style-name=""" + sigToCe.Value(sig).StringValue + """" + attrs
+		      End If
+		      ' Formula: convert R1C1-authored formulas to A1 (anchored here), then
+		      ' A1 -> ODF (of:=…[.A1]…). Read formulas are already A1.
+		      If cell.HasFormula Then
+		        Var fA1 As String = cell.Formula
+		        If cell.FormulaIsR1C1 Then fA1 = XLSXHelpers.FormulaToA1(cell.Formula, r, c)
+		        attrs = " table:formula=""" + XLSXHelpers.XmlEscape(XLSXHelpers.A1ToOdfFormula(fA1)) + """" + attrs
 		      End If
 		      rowParts.Add CellXml(cell, attrs)
 		    Next
@@ -166,8 +230,10 @@ Protected Module ODSWriter
 		    Return "<table:table-cell office:value-type=""date"" office:date-value=""" + iso + """" + attrs + "/>"
 
 		  Case XLSXEnums.eCellType.Number, XLSXEnums.eCellType.FormulaCached
+		    ' A formula with no cached value yet still needs a valid float value.
+		    Var v As String = If(cell.RawString <> "", cell.RawString, "0")
 		    Return "<table:table-cell office:value-type=""float"" office:value=""" _
-		      + XLSXHelpers.XmlEscape(cell.RawString) + """" + attrs + "/>"
+		      + XLSXHelpers.XmlEscape(v) + """" + attrs + "/>"
 
 		  Else
 		    ' Str, ErrorVal: inline text, one <text:p> per line.
@@ -367,6 +433,127 @@ Protected Module ODSWriter
 		Private Function Pad2(v As Integer) As String
 		  If v < 10 Then Return "0" + Str(v)
 		  Return Str(v)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 537461626C65206B657920666F7220612063656C6C27732066756C6C204F445320617070656172616E636520286E756D62657220666F726D6174202B2076697375616C207374796C65293B20656D707479207768656E20706C61696E2E0A
+		Private Function CellStyleSignature(code As String, cst As XLSXCellStyle) As String
+		  ' Stable key for a cell's full ODS appearance (number format + visual style).
+		  ' Empty when the cell is plain (no format and a default visual style).
+		  If (code = "" Or code = "General") And cst.IsDefault Then Return ""
+		  Var p() As String
+		  p.Add code
+		  p.Add If(cst.Bold, "b", "") + If(cst.Italic, "i", "") + If(cst.Underline, "u", "")
+		  p.Add cst.FontName
+		  p.Add Str(cst.FontSize)
+		  p.Add If(cst.HasFontColor, OdsColorHex(cst.FontColor), "")
+		  p.Add If(cst.HasBackground, OdsColorHex(cst.BackgroundColor), "")
+		  p.Add Str(Integer(cst.AlignH)) + Str(Integer(cst.AlignV)) + If(cst.WrapText, "w", "")
+		  p.Add Str(Integer(cst.BorderLeft)) + Str(Integer(cst.BorderRight)) + Str(Integer(cst.BorderTop)) + Str(Integer(cst.BorderBottom))
+		  p.Add If(cst.HasBorderColor, OdsColorHex(cst.BorderColor), "")
+		  Return String.FromArray(p, "|")
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 4F6E65207461626C652D63656C6C203C7374796C653A7374796C653E3A206F7074696F6E616C20646174612D7374796C652D6E616D6520706C7573207461626C652D63656C6C2F7061726167726170682F746578742070726F706572747920656C656D656E74732E0A
+		Private Function CellStyleXml(name As String, dataStyleName As String, cst As XLSXCellStyle) As String
+		  ' One table-cell <style:style>: optional data-style-name (number format) +
+		  ' table-cell / paragraph / text property elements (ODF child order).
+		  Var head As String = "<style:style style:name=""" + name + """ style:family=""table-cell"""
+		  If dataStyleName <> "" Then head = head + " style:data-style-name=""" + dataStyleName + """"
+		  Var props As String = CellPropsXml(cst) + ParaPropsXml(cst) + TextPropsXml(cst)
+		  If props = "" Then Return head + "/>"
+		  Return head + ">" + props + "</style:style>"
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 3C7374796C653A7461626C652D63656C6C2D70726F706572746965733E3A2066696C6C2C207065722D6564676520626F72646572732C20766572746963616C20616C69676E6D656E742C20777261702E0A
+		Private Function CellPropsXml(cst As XLSXCellStyle) As String
+		  ' <style:table-cell-properties>: fill, borders, vertical alignment, wrap.
+		  Var a() As String
+		  If cst.HasBackground Then a.Add "fo:background-color=""" + OdsColorHex(cst.BackgroundColor) + """"
+		  Var bc As String = If(cst.HasBorderColor, OdsColorHex(cst.BorderColor), "#000000")
+		  a.Add OdsBorderAttr("fo:border-left", cst.BorderLeft, bc)
+		  a.Add OdsBorderAttr("fo:border-right", cst.BorderRight, bc)
+		  a.Add OdsBorderAttr("fo:border-top", cst.BorderTop, bc)
+		  a.Add OdsBorderAttr("fo:border-bottom", cst.BorderBottom, bc)
+		  Select Case cst.AlignV
+		  Case XLSXEnums.eAlignV.Top
+		    a.Add "style:vertical-align=""top"""
+		  Case XLSXEnums.eAlignV.Middle
+		    a.Add "style:vertical-align=""middle"""
+		  End Select
+		  If cst.WrapText Then a.Add "fo:wrap-option=""wrap"""
+		  Return WrapProps("style:table-cell-properties", a)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 3C7374796C653A7061726167726170682D70726F7065727469657320666F3A746578742D616C69676E3D2273746172747C63656E7465727C656E64223E2E0A
+		Private Function ParaPropsXml(cst As XLSXCellStyle) As String
+		  ' <style:paragraph-properties fo:text-align="start|center|end"/>.
+		  Var ta As String
+		  Select Case cst.AlignH
+		  Case XLSXEnums.eAlignH.Left
+		    ta = "start"
+		  Case XLSXEnums.eAlignH.Center
+		    ta = "center"
+		  Case XLSXEnums.eAlignH.Right
+		    ta = "end"
+		  Else
+		    Return ""
+		  End Select
+		  Return "<style:paragraph-properties fo:text-align=""" + ta + """/>"
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 3C7374796C653A746578742D70726F706572746965733E3A20666F6E74207765696768742F7374796C652F756E6465726C696E652F636F6C6F75722F73697A652F66616D696C792E0A
+		Private Function TextPropsXml(cst As XLSXCellStyle) As String
+		  ' <style:text-properties>: font weight/style/underline/color/size/family.
+		  Var a() As String
+		  If cst.Bold Then a.Add "fo:font-weight=""bold"""
+		  If cst.Italic Then a.Add "fo:font-style=""italic"""
+		  If cst.Underline Then a.Add "style:text-underline-style=""solid"" style:text-underline-width=""auto"" style:text-underline-color=""font-color"""
+		  If cst.HasFontColor Then a.Add "fo:color=""" + OdsColorHex(cst.FontColor) + """"
+		  If cst.FontSize > 0 Then a.Add "fo:font-size=""" + Str(cst.FontSize) + "pt"""
+		  If cst.FontName <> "" Then a.Add "fo:font-family=""" + XLSXHelpers.XmlEscape(cst.FontName) + """"
+		  Return WrapProps("style:text-properties", a)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 4A6F696E206E6F6E2D656D7074792061747472696275746520737472696E677320696E746F206F6E6520656C656D656E742C206F72202222206966206E6F6E652E0A
+		Private Function WrapProps(elementName As String, attrs() As String) As String
+		  ' Join non-empty attribute strings into one element, or "" if none.
+		  Var kept() As String
+		  For Each s As String In attrs
+		    If s <> "" Then kept.Add s
+		  Next
+		  If kept.Count = 0 Then Return ""
+		  Return "<" + elementName + " " + String.FromArray(kept, " ") + "/>"
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 4275696C6420616E20666F3A626F726465722D3C656467653E2076616C7565202822302E3570747C3170747C32707420736F6C69642023727267676262222920666F72207468696E2F6D656469756D2F746869636B2C20656C73652022222E0A
+		Private Function OdsBorderAttr(attrName As String, style As XLSXEnums.eBorderStyle, colorHex As String) As String
+		  ' "0.5pt|1pt|2pt solid #rrggbb" for thin/medium/thick, or "" for None.
+		  If style = XLSXEnums.eBorderStyle.None Then Return ""
+		  Var w As String = "0.5pt"
+		  If style = XLSXEnums.eBorderStyle.Medium Then w = "1pt"
+		  If style = XLSXEnums.eBorderStyle.Thick Then w = "2pt"
+		  Return attrName + "=""" + w + " solid " + colorHex + """"
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 466F726D6174206120436F6C6F72206173204F4453202223727267676262222E0A
+		Private Function OdsColorHex(c As Color) As String
+		  Return "#" + Pad2Hex(c.Red) + Pad2Hex(c.Green) + Pad2Hex(c.Blue)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 54776F2D64696769742068657820666F72206120302E2E32353520627974652E0A
+		Private Function Pad2Hex(v As Integer) As String
+		  Var h As String = Hex(v)
+		  If h.Length < 2 Then h = "0" + h
+		  Return h
 		End Function
 	#tag EndMethod
 

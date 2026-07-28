@@ -1,18 +1,38 @@
 #tag Module
 Protected Module XLSXWebListboxFiller
-	#tag Method, Flags = &h0, Description = 46696C6C2061205765624C697374426F782066726F6D20616E20584C535853686565742E2056696577696E67206D6F6465202864656661756C74293A206669727374206E6F6E2D656D70747920726F77206265636F6D657320746865206865616465722C20656D70747920726F777320736B69707065642E2047726964206D6F6465202873686F77416C6C43656C6C73293A20636F6C756D6E206C65747465727320617320686561646572732C20657665727920726F772073686F776E202D20666F722065646974696E672F6275696C64696E67207368656574732E0A
-		Sub Fill(lb As WebListBox, sheet As XLSXSheet, styles As XLSXStyles, showAllCells As Boolean = False)
+	#tag Method, Flags = &h0, Description = 46696C6C2061205765624C697374426F782066726F6D20616E20584C535853686565742E204120706C61696E20666972737420726F772069732070726F6D6F74656420746F2074686520636F6C756D6E2D686561646572206261723B2061207374796C656420666972737420726F7720286F722067726964206D6F646529207573657320412F422F43206865616465727320736F20746865207374796C656420726F772072656E6465727320617320646174612E20547261696C696E6720656D70747920726F7773207472696D6D65642028696E746572696F72206F6E6573206B6570742920756E6C65737320696E2067726964206D6F64652E0A
+		Sub Fill(lb As WebListBox, sheet As XLSXSheet, styles As XLSXStyles, showAllCells As Boolean = False, showFormulas As Boolean = False)
 		  lb.RemoveAllRows
 		  Var cols As Integer = Max(1, sheet.ColCount)
 		  lb.ColumnCount = cols
 
-		  ' Two display modes:
-		  '  - viewing (default): first non-empty row becomes the header, rows
-		  '    where every cell renders empty are skipped.
-		  '  - grid (showAllCells): column letters as headers, every row shown —
-		  '    used when editing / building a sheet from scratch.
+		  ' Apply explicit column widths (WebListBox.ColumnWidths is in pixels;
+		  ' the model stores points, so convert pt -> px = pt * 4/3 at 96 DPI).
+		  ' Columns with no stored width get "*" (fill). Only set when the sheet
+		  ' actually carries widths, otherwise leave the web auto-sizing alone.
+		  If sheet.HasColumnWidths Then
+		    Var widthParts() As String
+		    For c As Integer = 1 To cols
+		      Var wpt As Double = sheet.ColumnWidth(c)
+		      If wpt > 0 Then
+		        widthParts.Add Str(Round(wpt * 4.0 / 3.0))
+		      Else
+		        widthParts.Add "*"
+		      End If
+		    Next
+		    lb.ColumnWidths = String.FromArray(widthParts, ",")
+		  End If
+
+		  ' Header handling:
+		  '  - promote (default for plain sheets): the first non-empty row becomes
+		  '    the column-header bar; data starts on the next row.
+		  '  - column-letters: A/B/C headers and every row shown as data. Used in
+		  '    grid mode AND when the first row is styled (so its fill/font renders
+		  '    as a normal styled row — the Web header bar can't be styled).
+		  ' Body trims only trailing empty rows (see below); interior ones are kept.
+		  Var promoteHeader As Boolean = PromotesHeader(sheet, styles, showAllCells)
 		  Var firstDataRow As Integer
-		  If showAllCells Then
+		  If Not promoteHeader Then
 		    For c As Integer = 1 To cols
 		      lb.HeaderAt(c - 1) = XLSXCellRef.IndexToColLetters(c)
 		    Next
@@ -21,37 +41,110 @@ Protected Module XLSXWebListboxFiller
 		    Var headerRow As Integer = FindFirstNonEmptyRow(sheet)
 		    If headerRow = 0 Then Return
 		    For c As Integer = 1 To cols
-		      lb.HeaderAt(c - 1) = sheet.CellAt(headerRow, c).DisplayText(styles)
+		      Var hc As XLSXCell = sheet.CellAt(headerRow, c)
+		      lb.HeaderAt(c - 1) = If(showFormulas And hc.HasFormula, hc.FormulaText, hc.DisplayText(styles))
 		    Next
 		    firstDataRow = headerRow + 1
 		  End If
 
-		  ' Body rows. Build texts first so viewing mode can skip rows where every
-		  ' cell is empty (Excel often leaves styled-but-empty rows inflating RowCount).
-		  For r As Integer = firstDataRow To sheet.RowCount
+		  ' Body rows. Viewing mode trims only the *trailing* empty rows (Excel often
+		  ' leaves styled-but-empty rows inflating RowCount); interior empty rows are
+		  ' kept so the on-screen grid matches the file (and a saved copy of it).
+		  Var lastRow As Integer = sheet.RowCount
+		  If Not showAllCells Then lastRow = LastContentRow(sheet, cols, firstDataRow)
+		  For r As Integer = firstDataRow To lastRow
 		    Var rowTexts() As String
-		    Var anyNonEmpty As Boolean = False
 		    For c As Integer = 1 To cols
 		      Var text As String
 		      If sheet.IsCellMergedFollower(r, c) Then
 		        text = ""
 		      Else
-		        text = sheet.CellAt(r, c).DisplayText(styles)
+		        Var dc As XLSXCell = sheet.CellAt(r, c)
+		        text = If(showFormulas And dc.HasFormula, dc.FormulaText, dc.DisplayText(styles))
 		      End If
 		      rowTexts.Add text
-		      If text <> "" Then anyNonEmpty = True
 		    Next
-		    If Not showAllCells And Not anyNonEmpty Then Continue
 		    lb.AddRow("")
 		    Var lbRow As Integer = lb.RowCount - 1
-		    ' Remember which sheet row this listbox row shows (empty rows are
-		    ' skipped, so indexes differ); used to write cell edits back.
+		    ' Remember which sheet row this listbox row shows (row indexes line up
+		    ' 1:1 in viewing mode); used to write cell edits back.
 		    lb.CellTagAt(lbRow, 0) = r
 		    For c As Integer = 0 To cols - 1
 		      lb.CellTextAt(lbRow, c) = rowTexts(c)
+		      ' Apply a styled cell renderer for non-default cells (WebStyle has no
+		      ' alignment, so numeric right-align isn't reproduced on the Web).
+		      If Not sheet.IsCellMergedFollower(r, c + 1) Then
+		        Var st As XLSXCellStyle = sheet.EffectiveStyle(r, c + 1)
+		        If st <> Nil And Not st.IsDefault Then
+		          lb.CellRendererAt(lbRow, c) = New WebListBoxStyleRenderer(WebStyleFor(st), rowTexts(c))
+		        End If
+		      End If
 		    Next
 		  Next
 		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 4D617020616E20584C535843656C6C5374796C65206F6E746F2061205765625374796C65202866696C6C202F207465787420636F6C6F7572202F20666F6E74202F20756E69666F726D20626F72646572293B20616C69676E6D656E7420756E737570706F72746564206279205765625374796C652E0A
+		Private Function WebStyleFor(st As XLSXCellStyle) As WebStyle
+		  ' Map an XLSXCellStyle onto a WebStyle (fill / text colour / font / border).
+		  ' Per-edge borders collapse to one uniform border; alignment isn't supported.
+		  Var s As New WebStyle
+		  If st.HasBackground Then s.BackgroundColor = st.BackgroundColor
+		  If st.HasFontColor Then s.ForegroundColor = st.FontColor
+		  If st.Bold Then s.Bold = True
+		  If st.Italic Then s.Italic = True
+		  If st.Underline Then s.Underline = True
+		  If st.FontName <> "" Then s.FontName = st.FontName
+		  If st.FontSize > 0 Then s.FontSize = st.FontSize
+		  If st.HasAnyBorder Then
+		    s.BorderColor = If(st.HasBorderColor, st.BorderColor, Color.RGB(0, 0, 0))
+		    s.BorderThickness = MaxBorderThickness(st)
+		  End If
+		  Return s
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 546869636B657374206564676520696E20706978656C7320287468696E3D312C206D656469756D3D322C20746869636B3D33292E0A
+		Private Function MaxBorderThickness(st As XLSXCellStyle) As Integer
+		  ' Thickest edge -> pixels (thin=1, medium=2, thick=3).
+		  Var t As Integer = 0
+		  Var edges() As XLSXEnums.eBorderStyle = Array(st.BorderLeft, st.BorderRight, st.BorderTop, st.BorderBottom)
+		  For Each e As XLSXEnums.eBorderStyle In edges
+		    Var w As Integer = 0
+		    Select Case e
+		    Case XLSXEnums.eBorderStyle.Thin
+		      w = 1
+		    Case XLSXEnums.eBorderStyle.Medium
+		      w = 2
+		    Case XLSXEnums.eBorderStyle.Thick
+		      w = 3
+		    End Select
+		    If w > t Then t = w
+		  Next
+		  If t = 0 Then t = 1
+		  Return t
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 54727565207768656E2074686520666972737420726F772073686F756C64206265636F6D652074686520636F6C756D6E2D686561646572206261723A206F6E6C7920666F72206120706C61696E2028756E7374796C65642920666972737420726F77206F7574736964652067726964206D6F64652E2041207374796C656420666972737420726F772073746179732061206461746120726F7720736F20697473207374796C696E672072656E646572732E0A
+		Function PromotesHeader(sheet As XLSXSheet, styles As XLSXStyles, showAllCells As Boolean) As Boolean
+		  ' True when the first row should become the column-header bar: only for a
+		  ' plain (unstyled) first row outside grid mode. A styled first row stays a
+		  ' data row so its styling renders (the header bar can't be styled on Web).
+		  If showAllCells Then Return False
+		  Return Not HeaderRowIsStyled(sheet, styles)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function HeaderRowIsStyled(sheet As XLSXSheet, styles As XLSXStyles) As Boolean
+		  Var hr As Integer = FindFirstNonEmptyRow(sheet)
+		  If hr <= 0 Then Return False
+		  For c As Integer = 1 To sheet.ColCount
+		    If Not sheet.EffectiveStyle(hr, c).IsDefault Then Return True
+		  Next
+		  Return False
+		End Function
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 5363616E2074686520666972737420353020726F7773206F662074686520736865657420616E642072657475726E2074686520666972737420726F7720696E64657820746861742068617320616E79206E6F6E2D656D7074792063656C6C2E2052657475726E73203120696620616C6C2070726F62656420726F77732061726520656D7074792E0A
@@ -63,6 +156,20 @@ Protected Module XLSXWebListboxFiller
 		    Next
 		  Next
 		  Return 1
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21, Description = 4869676865737420726F772061742F616674657220666972737444617461526F7720686F6C64696E6720616E79206E6F6E2D656D7074792063656C6C3B206C657473207468652066696C6C6572207472696D20747261696C696E6720656D7074696573207768696C65206B656570696E6720696E746572696F72206F6E65732E2052657475726E7320666972737444617461526F772D31207768656E207468657265206973206E6F20626F647920636F6E74656E742E0A
+		Private Function LastContentRow(sheet As XLSXSheet, cols As Integer, firstDataRow As Integer) As Integer
+		  ' Highest row at/after firstDataRow that holds any non-empty cell. Lets the
+		  ' filler trim trailing empty rows while keeping interior ones. Returns
+		  ' firstDataRow - 1 when there is no body content at all.
+		  For r As Integer = sheet.RowCount DownTo firstDataRow
+		    For c As Integer = 1 To cols
+		      If Not sheet.CellAt(r, c).IsEmpty Then Return r
+		    Next
+		  Next
+		  Return firstDataRow - 1
 		End Function
 	#tag EndMethod
 

@@ -24,6 +24,26 @@ Protected Module XLSXEnums
 		Disk = 2
 	#tag EndEnum
 
+	#tag Enum, Name = eAlignH, Type = Integer, Flags = &h0
+		General = 0
+		  Left = 1
+		  Center = 2
+		Right = 3
+	#tag EndEnum
+
+	#tag Enum, Name = eAlignV, Type = Integer, Flags = &h0
+		Bottom = 0
+		  Top = 1
+		Middle = 2
+	#tag EndEnum
+
+	#tag Enum, Name = eBorderStyle, Type = Integer, Flags = &h0
+		None = 0
+		  Thin = 1
+		  Medium = 2
+		Thick = 3
+	#tag EndEnum
+
 	#tag Note, Name = About
 		Enums shared by the XLSX parser.
 
