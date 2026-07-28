@@ -168,15 +168,6 @@ See [`test_files/README.md`](test_files/README.md) for the per-fixture mapping.
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See [`version_history.md`](version_history.md).
 
-## Contributing
-
-Pull requests welcome. A few non-obvious Xojo gotchas worth knowing before you edit `.xojo_code` files by hand:
-
-- ❌ **Never put `Description = …` on `#tag Class` / `#tag Module`** — it breaks the IDE's `Inherits` parser. Use a `#tag Note` instead.
-- ❌ **Never call `.ToString` on a parenthesized intrinsic expression** (e.g. `(a + b).ToString` fails to compile in API 2). Use `Str(...)` or extract to a typed local first.
-- ❌ **Don't end a `Module=…` manifest line with `;true`** — the IDE silently drops it on load. Use `;false`. The `Extends` mechanism makes extension methods globally callable regardless of the "Global module" flag.
-- ✅ **Edit only one `.xojo_project` at a time** — text-format files cannot be safely co-edited from two IDE instances.
-
 ## License
 
 [MIT](LICENSE) — Copyright © 2026 VeryNiceSW.
