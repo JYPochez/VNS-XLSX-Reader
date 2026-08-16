@@ -30,8 +30,21 @@ Protected Module XLSXWriter
 		  zip.AddPart("xl/workbook.xml", WorkbookXml(wb))
 		  zip.AddPart("xl/_rels/workbook.xml.rels", WorkbookRelsXml(wb))
 		  zip.AddPart("xl/styles.xml", stylesXml)
+		  Var tableCounter As Integer = 0
 		  For i As Integer = 1 To wb.SheetCount
-		    zip.AddPart("xl/worksheets/sheet" + Str(i) + ".xml", SheetXml(wb.SheetAt(i), wb.Styles, sigToXf))
+		    Var sheet As XLSXSheet = wb.SheetAtRaw(i)
+		    ' Excel Table parts: one xl/tables/tableN.xml per table (globally numbered)
+		    ' plus a worksheet rels part linking them.
+		    Var tableGlobalIds() As Integer
+		    For t As Integer = 0 To sheet.TableCount - 1
+		      tableCounter = tableCounter + 1
+		      tableGlobalIds.Add tableCounter
+		      zip.AddPart("xl/tables/table" + Str(tableCounter) + ".xml", TableXml(sheet.TableAt(t), tableCounter, sheet))
+		    Next
+		    If tableGlobalIds.Count > 0 Then
+		      zip.AddPart("xl/worksheets/_rels/sheet" + Str(i) + ".xml.rels", SheetRelsXml(tableGlobalIds))
+		    End If
+		    zip.AddPart("xl/worksheets/sheet" + Str(i) + ".xml", SheetXml(sheet, wb.Styles, sigToXf, tableGlobalIds.Count))
 		  Next
 		  Return zip
 		End Function
@@ -48,6 +61,13 @@ Protected Module XLSXWriter
 		  parts.Add "<Override PartName=""/xl/styles.xml"" ContentType=""application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml""/>"
 		  For i As Integer = 1 To wb.SheetCount
 		    parts.Add "<Override PartName=""/xl/worksheets/sheet" + Str(i) + ".xml"" ContentType=""application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml""/>"
+		  Next
+		  Var tableCount As Integer = 0
+		  For i As Integer = 1 To wb.SheetCount
+		    tableCount = tableCount + wb.SheetAtRaw(i).TableCount
+		  Next
+		  For k As Integer = 1 To tableCount
+		    parts.Add "<Override PartName=""/xl/tables/table" + Str(k) + ".xml"" ContentType=""application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml""/>"
 		  Next
 		  parts.Add "</Types>"
 		  Return String.FromArray(parts, "")
@@ -72,7 +92,7 @@ Protected Module XLSXWriter
 		  parts.Add "<workbook xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">"
 		  parts.Add "<sheets>"
 		  For i As Integer = 1 To wb.SheetCount
-		    Var nm As String = XLSXHelpers.XmlEscape(wb.SheetAt(i).Name)
+		    Var nm As String = XLSXHelpers.XmlEscape(wb.SheetAtRaw(i).Name)
 		    parts.Add "<sheet name=""" + nm + """ sheetId=""" + Str(i) + """ r:id=""rId" + Str(i) + """/>"
 		  Next
 		  parts.Add "</sheets>"
@@ -122,10 +142,10 @@ Protected Module XLSXWriter
 		  xfXml.Add "<xf numFmtId=""0"" fontId=""0"" fillId=""0"" borderId=""0"" xfId=""0""/>"
 
 		  For s As Integer = 1 To wb.SheetCount
-		    Var sheet As XLSXSheet = wb.SheetAt(s)
+		    Var sheet As XLSXSheet = wb.SheetAtRaw(s)
 		    For r As Integer = 1 To sheet.RowCount
 		      For c As Integer = 1 To sheet.ColCount
-		        Var cell As XLSXCell = sheet.CellAt(r, c)
+		        Var cell As XLSXCell = sheet.CellAtRaw(r, c)
 		        If cell.IsEmpty Then Continue
 		        Var code As String = XLSXHelpers.WriteFormatCode(cell, wb.Styles)
 		        Var cst As XLSXCellStyle = cell.ResolvedStyle(wb.Styles)
@@ -205,10 +225,13 @@ Protected Module XLSXWriter
 		  If cst.Bold Then f.Add "<b/>"
 		  If cst.Italic Then f.Add "<i/>"
 		  If cst.Underline Then f.Add "<u/>"
-		  Var sz As Double = If(cst.FontSize > 0, cst.FontSize, 11.0)
-		  f.Add "<sz val=""" + Str(sz) + """/>"
-		  Var nm As String = If(cst.FontName <> "", cst.FontName, "Calibri")
-		  f.Add "<name val=""" + XLSXHelpers.XmlEscape(nm) + """/>"
+		  ' Only emit size / name when the model actually specifies them. Inventing a
+		  ' default here turns "unspecified" into an explicit 11pt Calibri, which the
+		  ' reader then treats as a deliberate override — so an italic-only cell came
+		  ' back smaller than it went in. A font may legally carry just <i/>; the
+		  ' complete default font stays at index 0 for renderers that need one.
+		  If cst.FontSize > 0 Then f.Add "<sz val=""" + Str(cst.FontSize) + """/>"
+		  If cst.FontName <> "" Then f.Add "<name val=""" + XLSXHelpers.XmlEscape(cst.FontName) + """/>"
 		  If cst.HasFontColor Then f.Add "<color rgb=""" + ColorToHex(cst.FontColor) + """/>"
 		  Var id As Integer = fontXml.Count
 		  fontXml.Add "<font>" + String.FromArray(f, "") + "</font>"
@@ -313,16 +336,16 @@ Protected Module XLSXWriter
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 456D6974206F6E6520776F726B73686565743A20726F7773206F66203C633E2063656C6C732028696E6C696E6520737472696E67732C206E756D626572732F73657269616C732C20626F6F6C65616E732920706C7573203C6D6572676543656C6C733E2E0A
-		Private Function SheetXml(sheet As XLSXSheet, styles As XLSXStyles, sigToXf As Dictionary) As String
+		Private Function SheetXml(sheet As XLSXSheet, styles As XLSXStyles, sigToXf As Dictionary, tablePartCount As Integer = 0) As String
 		  Var parts() As String
 		  parts.Add "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>"
-		  parts.Add "<worksheet xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"">"
+		  parts.Add "<worksheet xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">"
 		  ' dimension + a default row height: Excel recomputes these anyway, but
 		  ' minimal renderers (e.g. macOS Quick Look) blow up row heights without
 		  ' an explicit defaultRowHeight.
 		  Var lastRef As String = "A1"
 		  If sheet.RowCount > 0 And sheet.ColCount > 0 Then
-		    lastRef = XLSXCellRef.IndexToColLetters(sheet.ColCount) + Str(sheet.RowCount)
+		    lastRef = XLSXCellRef.IndexToColLettersRaw(sheet.ColCount) + Str(sheet.RowCount)
 		  End If
 		  parts.Add "<dimension ref=""A1:" + lastRef + """/>"
 		  parts.Add "<sheetFormatPr defaultRowHeight=""15"" customHeight=""false""/>"
@@ -330,7 +353,7 @@ Protected Module XLSXWriter
 		  If sheet.HasColumnWidths Then
 		    Var colParts() As String
 		    For c As Integer = 1 To sheet.ColCount
-		      Var wpt As Double = sheet.ColumnWidth(c)
+		      Var wpt As Double = sheet.ColumnWidthRaw(c)
 		      If wpt <= 0 Then Continue
 		      Var chars As Double = XLSXHelpers.ColumnPointsToChars(wpt)
 		      colParts.Add "<col min=""" + Str(c) + """ max=""" + Str(c) + """ width=""" + Str(chars) + """ customWidth=""1""/>"
@@ -343,9 +366,9 @@ Protected Module XLSXWriter
 		  For r As Integer = 1 To sheet.RowCount
 		    Var rowCells() As String
 		    For c As Integer = 1 To sheet.ColCount
-		      Var cell As XLSXCell = sheet.CellAt(r, c)
+		      Var cell As XLSXCell = sheet.CellAtRaw(r, c)
 		      If cell.IsEmpty Then Continue
-		      Var ref As String = XLSXCellRef.IndexToColLetters(c) + Str(r)
+		      Var ref As String = XLSXCellRef.IndexToColLettersRaw(c) + Str(r)
 		      Var sAttr As String = ""
 		      Var sig As String = StyleSignature(XLSXHelpers.WriteFormatCode(cell, styles), cell.ResolvedStyle(styles))
 		      If sig <> "" And sigToXf.HasKey(sig) Then
@@ -373,7 +396,7 @@ Protected Module XLSXWriter
 		        End If
 		      End Select
 		    Next
-		    Var hpt As Double = sheet.RowHeight(r)
+		    Var hpt As Double = sheet.RowHeightRaw(r)
 		    Var rowAttrs As String = " r=""" + Str(r) + """"
 		    If hpt > 0 Then rowAttrs = rowAttrs + " ht=""" + Str(hpt) + """ customHeight=""1"""
 		    If rowCells.Count > 0 Then
@@ -391,14 +414,123 @@ Protected Module XLSXWriter
 		    For i As Integer = 0 To sheet.MergedRangeCount - 1
 		      Var rng As XLSXCellRange = sheet.MergedRangeAt(i)
 		      If rng Is Nil Then Continue
-		      Var ref As String = XLSXCellRef.IndexToColLetters(rng.FirstCol) + Str(rng.FirstRow) _
-		        + ":" + XLSXCellRef.IndexToColLetters(rng.LastCol) + Str(rng.LastRow)
+		      Var ref As String = XLSXCellRef.IndexToColLettersRaw(rng.FirstColRaw) + Str(rng.FirstRowRaw) _
+		        + ":" + XLSXCellRef.IndexToColLettersRaw(rng.LastColRaw) + Str(rng.LastRowRaw)
 		      parts.Add "<mergeCell ref=""" + ref + """/>"
 		    Next
 		    parts.Add "</mergeCells>"
 		  End If
 
+		  If tablePartCount > 0 Then
+		    parts.Add "<tableParts count=""" + Str(tablePartCount) + """>"
+		    For k As Integer = 1 To tablePartCount
+		      parts.Add "<tablePart r:id=""rId" + Str(k) + """/>"
+		    Next
+		    parts.Add "</tableParts>"
+		  End If
 		  parts.Add "</worksheet>"
+		  Return String.FromArray(parts, "")
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function TableXml(table As XLSXTable, globalId As Integer, sheet As XLSXSheet) As String
+		  ' Emit one xl/tables/tableN.xml for an Excel Table (ListObject): range,
+		  ' autoFilter, tableColumns (names taken from the header row), tableStyleInfo.
+		  Var ref As String = XLSXCellRef.IndexToColLettersRaw(table.FirstColRaw) + Str(table.FirstRowRaw) _
+		    + ":" + XLSXCellRef.IndexToColLettersRaw(table.LastColRaw) + Str(table.LastRowRaw)
+		  Var nm As String = XLSXHelpers.XmlEscape(SanitizeTableName(table.Name, globalId))
+		  Var parts() As String
+		  parts.Add "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>"
+		  Var attrs As String = "id=""" + Str(globalId) + """ name=""" + nm + """ displayName=""" + nm _
+		    + """ ref=""" + ref + """ headerRowCount=""" + Str(table.HeaderRowCount) + """"
+		  If table.TotalsRowCount > 0 Then
+		    attrs = attrs + " totalsRowShown=""1"" totalsRowCount=""" + Str(table.TotalsRowCount) + """"
+		  Else
+		    attrs = attrs + " totalsRowShown=""0"""
+		  End If
+		  parts.Add "<table xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"" " + attrs + ">"
+		  If table.HeaderRowCount > 0 Then
+		    Var afLast As Integer = table.LastRowRaw - table.TotalsRowCount
+		    Var afRef As String = XLSXCellRef.IndexToColLettersRaw(table.FirstColRaw) + Str(table.FirstRowRaw) _
+		      + ":" + XLSXCellRef.IndexToColLettersRaw(table.LastColRaw) + Str(afLast)
+		    parts.Add "<autoFilter ref=""" + afRef + """/>"
+		  End If
+		  Var names() As String = TableColumnNames(table, sheet)
+		  parts.Add "<tableColumns count=""" + Str(names.Count) + """>"
+		  For j As Integer = 0 To names.LastIndex
+		    parts.Add "<tableColumn id=""" + Str(j + 1) + """ name=""" + XLSXHelpers.XmlEscape(names(j)) + """/>"
+		  Next
+		  parts.Add "</tableColumns>"
+		  Var tsi As String = "<tableStyleInfo"
+		  If table.StyleName <> "" Then tsi = tsi + " name=""" + XLSXHelpers.XmlEscape(table.StyleName) + """"
+		  tsi = tsi + " showFirstColumn=""" + If(table.ShowFirstColumn, "1", "0") + """"
+		  tsi = tsi + " showLastColumn=""" + If(table.ShowLastColumn, "1", "0") + """"
+		  tsi = tsi + " showRowStripes=""" + If(table.ShowRowStripes, "1", "0") + """"
+		  tsi = tsi + " showColumnStripes=""" + If(table.ShowColumnStripes, "1", "0") + """/>"
+		  parts.Add tsi
+		  parts.Add "</table>"
+		  Return String.FromArray(parts, "")
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function TableColumnNames(table As XLSXTable, sheet As XLSXSheet) As String()
+		  ' Column names from the table's header row; blanks get ColumnN; duplicates get
+		  ' a numeric suffix (Excel requires unique, non-empty column names).
+		  Var names() As String
+		  Var seen As New Dictionary
+		  For c As Integer = table.FirstColRaw To table.LastColRaw
+		    Var nm As String = ""
+		    ' Verbatim — Excel requires each tableColumn name to match its header cell
+		    ' EXACTLY, and flags the workbook as needing repair otherwise. Trimming
+		    ' would rename a real-world header like " Sales" (Microsoft's own Financial
+		    ' Sample has one) to "Sales" while the cell keeps its leading space.
+		    If table.HeaderRowCount > 0 Then nm = sheet.CellAtRaw(table.FirstRowRaw, c).RawString
+		    If nm = "" Then nm = "Column" + Str(c - table.FirstColRaw + 1)
+		    Var base As String = nm
+		    Var n As Integer = 2
+		    While seen.HasKey(nm)
+		      nm = base + Str(n)
+		      n = n + 1
+		    Wend
+		    seen.Value(nm) = True
+		    names.Add nm
+		  Next
+		  Return names
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function SanitizeTableName(rawName As String, globalId As Integer) As String
+		  ' Excel's name/displayName must be a valid identifier: letters/digits/_ only,
+		  ' starting with a letter or underscore. Fall back to TableN.
+		  Var out As String = ""
+		  For i As Integer = 0 To rawName.Length - 1
+		    Var ch As String = rawName.Middle(i, 1)
+		    If (ch >= "A" And ch <= "Z") Or (ch >= "a" And ch <= "z") Or (ch >= "0" And ch <= "9") Or ch = "_" Then
+		      out = out + ch
+		    Else
+		      out = out + "_"
+		    End If
+		  Next
+		  If out = "" Then Return "Table" + Str(globalId)
+		  Var first As String = out.Middle(0, 1)
+		  If Not ((first >= "A" And first <= "Z") Or (first >= "a" And first <= "z") Or first = "_") Then out = "_" + out
+		  Return out
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function SheetRelsXml(tableGlobalIds() As Integer) As String
+		  ' Worksheet rels linking each rIdK to ../tables/table{globalId}.xml.
+		  Var parts() As String
+		  parts.Add "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>"
+		  parts.Add "<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">"
+		  For k As Integer = 0 To tableGlobalIds.LastIndex
+		    parts.Add "<Relationship Id=""rId" + Str(k + 1) + """ Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/table"" Target=""../tables/table" + Str(tableGlobalIds(k)) + ".xml""/>"
+		  Next
+		  parts.Add "</Relationships>"
 		  Return String.FromArray(parts, "")
 		End Function
 	#tag EndMethod

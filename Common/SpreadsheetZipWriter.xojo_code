@@ -221,19 +221,19 @@ Protected Class SpreadsheetZipWriter
 		End Function
 	#tag EndMethod
 
-	#tag Property, Flags = &h21
+	#tag Property, Flags = &h21, Description = 456E747279206E616D65732C20696E204164645061727420283D206172636869766529206F726465722E0A
 		Private mNames() As String
 	#tag EndProperty
 
-	#tag Property, Flags = &h21
+	#tag Property, Flags = &h21, Description = 556E636F6D7072657373656420656E7472792062797465732C20706172616C6C656C20746F206D4E616D65732E0A
 		Private mDatas() As MemoryBlock
 	#tag EndProperty
 
-	#tag Property, Flags = &h21
+	#tag Property, Flags = &h21, Description = 5472756520666F7263657320636F6D7072657373696F6E206D6574686F642030202873746F7265642920666F72207468617420656E7472792E0A
 		Private mForceStored() As Boolean
 	#tag EndProperty
 
-	#tag Property, Flags = &h21
+	#tag Property, Flags = &h21, Description = 4C617A696C79206275696C74203235362D656E747279204352432D3332206C6F6F6B7570207461626C652E0A
 		Private mCrcTable() As UInt32
 	#tag EndProperty
 

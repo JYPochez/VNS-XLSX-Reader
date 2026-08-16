@@ -3,7 +3,7 @@ Protected Class XLSXSheet
 	#tag Method, Flags = &h0, Description = 5061727365206F6E6520776F726B7368656574277320584D4C20696E746F2063656C6C73202B206D65726765642072616E6765732E0A
 		Sub Constructor(name As String, tabIndex As Integer, sheetXml As String, sharedStrings() As String, styles As XLSXStyles = Nil, date1904 As Boolean = False)
 		  Me.Name = name
-		  Me.TabIndex = tabIndex
+		  mTabIndex = tabIndex
 		  mCells = New Dictionary
 		  mMergeFollowers = New Dictionary
 		  mMergeRanges = New Dictionary
@@ -22,7 +22,7 @@ Protected Class XLSXSheet
 		  ' and AddMergedRange. Used by ODSReader (and any non-XLSX source) to build
 		  ' the shared workbook model directly.
 		  Me.Name = name
-		  Me.TabIndex = tabIndex
+		  mTabIndex = tabIndex
 		  mCells = New Dictionary
 		  mMergeFollowers = New Dictionary
 		  mMergeRanges = New Dictionary
@@ -31,8 +31,8 @@ Protected Class XLSXSheet
 		End Sub
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 5769647468206F66206120312D626173656420636F6C756D6E20696E20706F696E74732C206F7220302069662069742075736573207468652073686565742064656661756C742E20506F696E7473206973207468652063616E6F6E6963616C20776964746820756E6974206163726F737320626F746820666F726D6174732E0A
-		Function ColumnWidth(col As Integer) As Double
+	#tag Method, Flags = &h0, Description = 5769647468206F66206120312D626173656420636F6C756D6E20696E20706F696E74732C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Function ColumnWidthRaw(col As Integer) As Double
 		  ' Width of a 1-based column in points, or 0 if the column uses the
 		  ' sheet default. Canonical unit is points across both formats.
 		  If mColWidths.HasKey(col) Then Return mColWidths.Value(col)
@@ -40,8 +40,8 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 53657420286F7220636C6561722C207768656E203C3D203029206120312D626173656420636F6C756D6E277320776964746820696E20706F696E74732E0A
-		Sub SetColumnWidth(col As Integer, widthPoints As Double)
+	#tag Method, Flags = &h0, Description = 536574206120312D626173656420636F6C756D6E277320776964746820696E20706F696E74732C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Sub SetColumnWidthRaw(col As Integer, widthPoints As Double)
 		  ' Set (or clear, when widthPoints <= 0) a 1-based column's width in points.
 		  If col <= 0 Then Return
 		  If widthPoints <= 0 Then
@@ -52,16 +52,16 @@ Protected Class XLSXSheet
 		End Sub
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 486569676874206F66206120312D626173656420726F7720696E20706F696E74732C206F7220302069662069742075736573207468652073686565742064656661756C742E0A
-		Function RowHeight(row As Integer) As Double
+	#tag Method, Flags = &h0, Description = 486569676874206F66206120312D626173656420726F7720696E20706F696E74732C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Function RowHeightRaw(row As Integer) As Double
 		  ' Height of a 1-based row in points, or 0 if the row uses the sheet default.
 		  If mRowHeights.HasKey(row) Then Return mRowHeights.Value(row)
 		  Return 0.0
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 53657420286F7220636C6561722C207768656E203C3D203029206120312D626173656420726F7727732068656967687420696E20706F696E74732E0A
-		Sub SetRowHeight(row As Integer, heightPoints As Double)
+	#tag Method, Flags = &h0, Description = 536574206120312D626173656420726F7727732068656967687420696E20706F696E74732C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Sub SetRowHeightRaw(row As Integer, heightPoints As Double)
 		  ' Set (or clear, when heightPoints <= 0) a 1-based row's height in points.
 		  If row <= 0 Then Return
 		  If heightPoints <= 0 Then
@@ -84,8 +84,8 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 496E736572742061207072652D6275696C7420584C535843656C6C206174206120312D62617365642028726F772C20636F6C292C207570646174696E672074686520736865657420657874656E742E2055736564206279206E6F6E2D584C535820736F757263657320284F4453526561646572292E0A
-		Sub PutCell(row As Integer, col As Integer, cell As XLSXCell)
+	#tag Method, Flags = &h0, Description = 496E736572742061207072652D6275696C742063656C6C206174206120312D62617365642028726F772C20636F6C292C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Sub PutCellRaw(row As Integer, col As Integer, cell As XLSXCell)
 		  ' Insert a pre-built cell at a 1-based (row, col). Updates the sheet extent.
 		  If row <= 0 Or col <= 0 Or cell Is Nil Then Return
 		  Var key As Integer = (row * 16384) + col
@@ -95,11 +95,11 @@ Protected Class XLSXSheet
 		End Sub
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 5265636F72642061206D65726765642072656374616E676C652028312D62617365642C20696E636C75736976652920616E6420666C616720657665727920636F76657265642063656C6C206578636570742074686520616E63686F722E0A
-		Sub AddMergedRange(firstRow As Integer, firstCol As Integer, lastRow As Integer, lastCol As Integer)
+	#tag Method, Flags = &h0, Description = 5265636F72642061206D65726765642072656374616E676C6520676976656E20312D626173656420636F726E6572732C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Sub AddMergedRangeRaw(firstRow As Integer, firstCol As Integer, lastRow As Integer, lastCol As Integer)
 		  ' Record a merged rectangle and flag every covered cell except the anchor.
 		  If firstRow <= 0 Or firstCol <= 0 Or lastRow < firstRow Or lastCol < firstCol Then Return
-		  Var range As New XLSXCellRange(firstRow, firstCol, lastRow, lastCol)
+		  Var range As XLSXCellRange = XLSXCellRange.NewRaw(firstRow, firstCol, lastRow, lastCol)
 		  mMergeRanges.Value(mMergeRanges.KeyCount) = range
 		  For r As Integer = firstRow To lastRow
 		    For c As Integer = firstCol To lastCol
@@ -161,8 +161,8 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 52657475726E73207468652063656C6C2061742028726F772C20636F6C2920E2809420312D62617365642E204E65766572204E696C3B20616273656E742063656C6C732072657475726E20612073686172656420656D7074792073656E74696E656C2E0A
-		Function CellAt(row As Integer, col As Integer) As XLSXCell
+	#tag Method, Flags = &h0, Description = 43656C6C206174206120312D62617365642028726F772C20636F6C292C20627970617373696E6720696E646578207472616E736C6174696F6E2E205573656420627920706172736572732C2073657269616C697A65727320616E64207468652055492E204E65766572204E696C2E0A
+		Function CellAtRaw(row As Integer, col As Integer) As XLSXCell
 		  Var key As Integer = (row * 16384) + col
 		  If mCells.HasKey(key) Then Return mCells.Value(key)
 		  If mEmptyCell Is Nil Then mEmptyCell = New XLSXCell(XLSXEnums.eCellType.Empty, "", -1)
@@ -170,21 +170,21 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 496E6465786564206163636573736F72206765747465723A2077732E43656C6C28726F772C20636F6C292E2053616D652061732043656C6C41743B206E65766572204E696C2E0A
 		Function Cell(row As Integer, col As Integer) As XLSXCell
 		  ' Getter half of the indexed accessor: ws.Cell(r, c). Never Nil.
 		  Return CellAt(row, col)
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 496E6465786564206163636573736F72207365747465723A2077732E43656C6C28726F772C20636F6C29203D2063656C6C2E2053616D652061732050757443656C6C2E0A
 		Sub Cell(row As Integer, col As Integer, Assigns c As XLSXCell)
 		  ' Setter half: ws.Cell(r, c) = someCell.
 		  PutCell(row, col, c)
 		End Sub
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C616365206120737472696E672063656C6C2061742028726F772C20636F6C2920616E642072657475726E20697420666F7220666C75656E7420636861696E696E672E0A
 		Function PutText(row As Integer, col As Integer, text As String) As XLSXCell
 		  ' Place a string cell and return it for fluent chaining (.Bold etc.).
 		  Var c As XLSXCell = XLSXCell.TextCell(text)
@@ -193,7 +193,7 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C6163652061206E756D6265722063656C6C2061742028726F772C20636F6C2920616E642072657475726E20697420666F7220666C75656E7420636861696E696E672E0A
 		Function PutNumber(row As Integer, col As Integer, value As Double) As XLSXCell
 		  Var c As XLSXCell = XLSXCell.NumberCell(value)
 		  PutCell(row, col, c)
@@ -201,7 +201,7 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C6163652061206D6F6E65792D666F726D6174746564206E756D6265722063656C6C2061742028726F772C20636F6C2920616E642072657475726E2069742E0A
 		Function PutMoney(row As Integer, col As Integer, value As Double) As XLSXCell
 		  Var c As XLSXCell = XLSXCell.MoneyCell(value)
 		  PutCell(row, col, c)
@@ -209,7 +209,7 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C616365206120646174652063656C6C2061742028726F772C20636F6C2920616E642072657475726E20697420666F7220666C75656E7420636861696E696E672E0A
 		Function PutDate(row As Integer, col As Integer, dt As DateTime) As XLSXCell
 		  Var c As XLSXCell = XLSXCell.DateCell(dt)
 		  PutCell(row, col, c)
@@ -217,7 +217,7 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C616365206120646174652D616E642D74696D652063656C6C2061742028726F772C20636F6C2920616E642072657475726E2069742E0A
 		Function PutDateTime(row As Integer, col As Integer, dt As DateTime) As XLSXCell
 		  Var c As XLSXCell = XLSXCell.DateTimeCell(dt)
 		  PutCell(row, col, c)
@@ -225,7 +225,7 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C616365206120626F6F6C65616E2063656C6C2061742028726F772C20636F6C2920616E642072657475726E20697420666F7220666C75656E7420636861696E696E672E0A
 		Function PutBool(row As Integer, col As Integer, value As Boolean) As XLSXCell
 		  Var c As XLSXCell = XLSXCell.BoolCell(value)
 		  PutCell(row, col, c)
@@ -233,7 +233,7 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C61636520616E205231433120666F726D756C612063656C6C2028636F6E76657274656420746F204131206F6E207772697465292061742028726F772C20636F6C2920616E642072657475726E2069742E0A
 		Function PutFormula(row As Integer, col As Integer, formula As String) As XLSXCell
 		  ' Place an R1C1 formula (converted to A1 at write time). Returns it for chaining.
 		  Var c As XLSXCell = XLSXCell.FormulaCell(formula)
@@ -242,12 +242,92 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 506C61636520616E20413120666F726D756C612063656C6C202873746F72656420766572626174696D292061742028726F772C20636F6C2920616E642072657475726E2069742E0A
 		Function PutFormulaA1(row As Integer, col As Integer, formula As String) As XLSXCell
 		  ' Place an A1 formula (written verbatim). Returns it for chaining.
 		  Var c As XLSXCell = XLSXCell.FormulaCellA1(formula)
 		  PutCell(row, col, c)
 		  Return c
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 53697A65206F6E6520636F6C756D6E2028312D62617365642920746F20697473207769646573742072656E646572656420636F6E74656E7420616E642073746F72652074686520776964746820696E20706F696E74733B2072657475726E7320746861742077696474682C206F72203020666F7220616E20656D70747920636F6C756D6E2E206368617257696474685078207365747320746865207065722D636861726163746572206D65747269632E0A
+		Function AutoFitColumnRaw(col As Integer, charWidthPx As Double = 7.0) As Double
+		  ' Size one column to its widest rendered content and store the width.
+		  ' Measured in Excel character units (the unit Excel itself uses for column
+		  ' width), then converted to the model's canonical points. Returns the width
+		  ' in points, or 0 when the column is empty (left at the sheet default).
+		  ' Merged cells are skipped — their text spans columns — as Excel's AutoFit does.
+		  ' charWidthPx is the rendered width of one character, in pixels. The default
+		  ' 7.0 is Excel's own metric (Calibri 11); pass a larger value to fit a wider
+		  ' face or a bigger point size, e.g. AutoFitColumns(9) for a serif fallback.
+		  Const kPaddingChars As Double = 2.0    ' breathing room either side of the text
+		  Const kMinChars As Double = 4.0
+		  Const kMaxChars As Double = 60.0       ' stop one long cell blowing out the grid
+		  Const kBoldFactor As Double = 1.1      ' bold renders wider than the base metric
+		  Const kBaseFontSize As Double = 11.0   ' Calibri 11 = the width unit's reference
+		  If col <= 0 Then Return 0.0
+		  Var widest As Double = 0.0
+		  For r As Integer = 1 To mMaxRow
+		    If IsCellMergedFollowerRaw(r, col) Then Continue
+		    If IsWideMergeAnchor(r, col) Then Continue
+		    Var cell As XLSXCell = CellAtRaw(r, col)
+		    If cell.IsEmpty Then Continue
+		    Var n As Double = LongestLineLength(cell.DisplayText(mStyles))
+		    If n <= 0 Then Continue
+		    Var st As XLSXCellStyle = cell.ResolvedStyle(mStyles)
+		    If st <> Nil Then
+		      If st.Bold Then n = n * kBoldFactor
+		      If st.FontSize > 0 Then n = n * (st.FontSize / kBaseFontSize)
+		    End If
+		    If n > widest Then widest = n
+		  Next
+		  If widest <= 0 Then Return 0.0
+		  Var chars As Double = widest + kPaddingChars
+		  If chars < kMinChars Then chars = kMinChars
+		  If chars > kMaxChars Then chars = kMaxChars
+		  Var pts As Double = XLSXHelpers.ColumnCharsToPoints(chars, charWidthPx)
+		  SetColumnWidthRaw(col, pts)
+		  Return pts
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 53697A65206576657279207573656420636F6C756D6E20746F2069747320636F6E74656E742E206368617257696474685078206973207468652072656E6465726564207769647468206F66206F6E652063686172616374657220696E20706978656C73202864656661756C7420372C20457863656C27732043616C69627269203131207265666572656E6365293B20726169736520697420666F72206120776964657220666F6E742E0A
+		Sub AutoFitColumns(charWidthPx As Double = 7.0)
+		  ' Size every used column to its content (see AutoFitColumn). The widths land
+		  ' in the model, so they show on screen AND are written to the saved file.
+		  ' charWidthPx is the rendered width of one character in pixels — raise it to
+		  ' match a wider font than Excel's Calibri 11 reference.
+		  For c As Integer = 1 To mMaxCol
+		    Call AutoFitColumnRaw(c, charWidthPx)
+		  Next
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function LongestLineLength(text As String) As Double
+		  ' Character count of the longest line — a wrapped/multi-line cell should size
+		  ' to its widest line, not to the total length of all its lines.
+		  If text = "" Then Return 0.0
+		  If text.IndexOf(EndOfLine) < 0 Then Return text.Length
+		  Var widest As Integer = 0
+		  For Each seg As String In text.Split(EndOfLine)
+		    If seg.Length > widest Then widest = seg.Length
+		  Next
+		  Return widest
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function IsWideMergeAnchor(row As Integer, col As Integer) As Boolean
+		  ' True when (row, col) is the anchor of a merge spanning more than one column,
+		  ' whose text therefore isn't confined to this column.
+		  For i As Integer = 0 To mMergeRanges.KeyCount - 1
+		    Var rng As XLSXCellRange = mMergeRanges.Value(i)
+		    If rng Is Nil Then Continue
+		    If rng.FirstRowRaw = row And rng.FirstColRaw = col And rng.LastColRaw > rng.FirstColRaw Then Return True
+		  Next
+		  Return False
 		End Function
 	#tag EndMethod
 
@@ -264,8 +344,8 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 52657475726E73205472756520666F722063656C6C7320696E736964652061206D65726765642072616E6765207468617420617265204E4F542074686520746F702D6C65667420616E63686F722E20557365207468697320746F206C656176652063656C6C7320626C616E6B207768656E2066696C6C696E672061204C697374626F782E0A
-		Function IsCellMergedFollower(row As Integer, col As Integer) As Boolean
+	#tag Method, Flags = &h0, Description = 5472756520666F72206120312D62617365642063656C6C20636F76657265642062792061206D6572676520627574206E6F742069747320616E63686F722C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Function IsCellMergedFollowerRaw(row As Integer, col As Integer) As Boolean
 		  Var key As String = row.ToString + "," + col.ToString
 		  Return mMergeFollowers.HasKey(key)
 		End Function
@@ -291,19 +371,33 @@ Protected Class XLSXSheet
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 52656E646572207374796C6520666F722028726F772C20636F6C293A20616E206578706C696369742063656C6C207374796C652077696E732C20656C736520616E20656E636C6F73696E6720457863656C205461626C652773206275696C742D696E207374796C6520737570706C6965732061206865616465722066696C6C202F2062616E6465642D726F772074696E742E204E65766572204E696C2E0A
-		Function EffectiveStyle(row As Integer, col As Integer) As XLSXCellStyle
+	#tag Method, Flags = &h0, Description = 52656E646572207374796C6520666F72206120312D62617365642028726F772C20636F6C292C20627970617373696E6720696E646578207472616E736C6174696F6E2E204E65766572204E696C2E0A
+		Function EffectiveStyleRaw(row As Integer, col As Integer) As XLSXCellStyle
 		  ' The style used to render (row, col). Inside an Excel Table, the table's
 		  ' header fill / banded-row tint applies — but a cell's own explicit fill (a
 		  ' deliberate background) always wins over the table band. A bare default
 		  ' font / number-format on the cell must NOT suppress the table style, so we
 		  ' key only on whether the cell brings a background of its own.
-		  Var own As XLSXCellStyle = CellAt(row, col).ResolvedStyle(mStyles)
-		  If mStyles <> Nil And Not own.HasBackground Then
-		    Var ts As XLSXCellStyle = TableStyleForCell(row, col)
-		    If ts <> Nil Then Return ts
+		  Var own As XLSXCellStyle = CellAtRaw(row, col).ResolvedStyle(mStyles)
+		  If mStyles Is Nil Then Return own
+		  ' A cell's own explicit fill (a deliberate background) wins over the band.
+		  If own.HasBackground Then Return own
+		  Var ts As XLSXCellStyle = TableStyleForCell(row, col)
+		  If ts Is Nil Then Return own
+		  ' MERGE rather than replace. The table contributes the FILL (and, on a
+		  ' header row, its bold + light text); the cell keeps its own font name and
+		  ' size. Returning the table style wholesale dropped the cell's font, so
+		  ' banded rows rendered at the default size while plain rows used the
+		  ' workbook font — visibly different row heights/sizes in the same table.
+		  Var merged As XLSXCellStyle = own.Clone
+		  merged.BackgroundColor = ts.BackgroundColor
+		  merged.HasBackground = ts.HasBackground
+		  If ts.Bold Then merged.Bold = True
+		  If ts.HasFontColor Then
+		    merged.FontColor = ts.FontColor
+		    merged.HasFontColor = True
 		  End If
-		  Return own
+		  Return merged
 		End Function
 	#tag EndMethod
 
@@ -313,12 +407,12 @@ Protected Class XLSXSheet
 		  ' (header / striped body / plain). Nil when no table covers the cell or the
 		  ' role carries no styling.
 		  For Each t As XLSXTable In mTables
-		    If Not t.Contains(row, col) Then Continue
-		    Var isHeader As Boolean = t.IsHeaderRow(row)
+		    If Not t.ContainsRaw(row, col) Then Continue
+		    Var isHeader As Boolean = t.IsHeaderRowRaw(row)
 		    Var striped As Boolean = False
 		    If Not isHeader And t.ShowRowStripes Then
 		      ' Band every other body row (the first data row is unstriped).
-		      striped = ((row - t.FirstDataRow) Mod 2) = 1
+		      striped = ((row - t.FirstDataRowRaw) Mod 2) = 1
 		    End If
 		    Var st As XLSXCellStyle = mStyles.TableStyleCell(t.StyleName, isHeader, striped)
 		    If st <> Nil And Not st.IsDefault Then Return st
@@ -367,7 +461,7 @@ Protected Class XLSXSheet
 		    Var hi As Integer = maxC
 		    If hi <= 0 Or hi > mMaxCol Then hi = mMaxCol
 		    For c As Integer = minC To hi
-		      SetColumnWidth(c, widthPt)
+		      SetColumnWidthRaw(c, widthPt)
 		    Next
 		  Next
 		End Sub
@@ -379,7 +473,7 @@ Protected Class XLSXSheet
 		  Var rowIndex As Integer = If(rAttr <> "", Integer.FromString(rAttr), 0)
 		  ' Custom row height (in points) when present.
 		  Var htAttr As String = rowNode.GetAttribute("ht")
-		  If htAttr <> "" And rowIndex > 0 Then SetRowHeight(rowIndex, htAttr.ToDouble)
+		  If htAttr <> "" And rowIndex > 0 Then SetRowHeightRaw(rowIndex, htAttr.ToDouble)
 		  Var cells As XmlNodeList = rowNode.Xql("./*[local-name()='c']")
 		  For i As Integer = 0 To cells.Length - 1
 		    ParseCell(cells.Item(i), rowIndex)
@@ -396,7 +490,7 @@ Protected Class XLSXSheet
 		  Var row As Integer = rowFallback
 		  Var col As Integer = 0
 		  If refAttr <> "" Then
-		    Call XLSXCellRef.A1ToRowCol(refAttr, row, col)
+		    Call XLSXCellRef.A1ToRowColRaw(refAttr, row, col)
 		  End If
 		  If row <= 0 Or col <= 0 Then Return
 
@@ -484,9 +578,9 @@ Protected Class XLSXSheet
 		    Var parts() As String = refAttr.Split(":")
 		    If parts.Count <> 2 Then Continue
 		    Var r1, c1, r2, c2 As Integer
-		    If Not XLSXCellRef.A1ToRowCol(parts(0), r1, c1) Then Continue
-		    If Not XLSXCellRef.A1ToRowCol(parts(1), r2, c2) Then Continue
-		    Var range As New XLSXCellRange(r1, c1, r2, c2)
+		    If Not XLSXCellRef.A1ToRowColRaw(parts(0), r1, c1) Then Continue
+		    If Not XLSXCellRef.A1ToRowColRaw(parts(1), r2, c2) Then Continue
+		    Var range As XLSXCellRange = XLSXCellRange.NewRaw(r1, c1, r2, c2)
 		    mMergeRanges.Value(i) = range
 		    For r As Integer = r1 To r2
 		      For c As Integer = c1 To c2
@@ -502,8 +596,29 @@ Protected Class XLSXSheet
 		Name As String
 	#tag EndProperty
 
-	#tag Property, Flags = &h0, Description = 312D626173656420706F736974696F6E206F66207468697320736865657420696E2074686520776F726B626F6F6B2E0A
+	#tag ComputedProperty, Flags = &h0, Description = 312D626173656420706F736974696F6E206F66207468697320736865657420696E2074686520776F726B626F6F6B2E0A
+		#tag Getter
+			Get
+			  Return XLSXHelpers.ToPublicIndex(mTabIndex)
+			End Get
+		#tag EndGetter
+		#tag Setter
+			Set
+			  mTabIndex = XLSXHelpers.ToInternalIndex(value)
+			End Set
+		#tag EndSetter
 		TabIndex As Integer
+	#tag EndComputedProperty
+
+	#tag Method, Flags = &h0, Description = 506F736974696F6E206F66207468697320736865657420696E2074686520776F726B626F6F6B2C20616C7761797320312D62617365642E0A
+		Function TabIndexRaw() As Integer
+		  ' Position of this sheet in the workbook, always 1-based.
+		  Return mTabIndex
+		End Function
+	#tag EndMethod
+
+	#tag Property, Flags = &h21
+		Private mTabIndex As Integer
 	#tag EndProperty
 
 	#tag Property, Flags = &h21, Description = 44696374696F6E617279206B657965642062792028726F77202A20313633383429202B20636F6C202D3E20584C535843656C6C2E205370617273652E0A
@@ -526,7 +641,7 @@ Protected Class XLSXSheet
 		Private mMaxCol As Integer = 0
 	#tag EndProperty
 
-	#tag Property, Flags = &h21
+	#tag Property, Flags = &h21, Description = 5265666572656E636520746F2074686520776F726B626F6F6B2773207265736F6C766564207368617265642D737472696E67732061727261793B207573656420647572696E6720706172736520746F20657870616E6420743D2273222063656C6C732E0A
 		Private mSharedStrings() As String
 	#tag EndProperty
 
@@ -553,6 +668,109 @@ Protected Class XLSXSheet
 	#tag Property, Flags = &h21
 		Private mTables() As XLSXTable
 	#tag EndProperty
+
+	#tag Method, Flags = &h0, Description = 52657475726E73207468652063656C6C2061742028726F772C20636F6C2920E2809420312D62617365642E204E65766572204E696C3B20616273656E742063656C6C732072657475726E20612073686172656420656D7074792073656E74696E656C2E0A
+		Function CellAt(row As Integer, col As Integer) As XLSXCell
+		  ' (row, col) in the caller's index base — 1-based unless
+		  ' gZeroBasedSheetsRowsColumns is set. Never Nil.
+		  Return CellAtRaw(XLSXHelpers.ToInternalIndex(row), XLSXHelpers.ToInternalIndex(col))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 496E736572742061207072652D6275696C7420584C535843656C6C206174206120312D62617365642028726F772C20636F6C292C207570646174696E672074686520736865657420657874656E742E2055736564206279206E6F6E2D584C535820736F757263657320284F4453526561646572292E0A
+		Sub PutCell(row As Integer, col As Integer, cell As XLSXCell)
+		  ' Insert a pre-built cell at (row, col) in the caller's index base.
+		  PutCellRaw(XLSXHelpers.ToInternalIndex(row), XLSXHelpers.ToInternalIndex(col), cell)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 5769647468206F66206120312D626173656420636F6C756D6E20696E20706F696E74732C206F7220302069662069742075736573207468652073686565742064656661756C742E20506F696E7473206973207468652063616E6F6E6963616C20776964746820756E6974206163726F737320626F746820666F726D6174732E0A
+		Function ColumnWidth(col As Integer) As Double
+		  Return ColumnWidthRaw(XLSXHelpers.ToInternalIndex(col))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 53657420286F7220636C6561722C207768656E203C3D203029206120312D626173656420636F6C756D6E277320776964746820696E20706F696E74732E0A
+		Sub SetColumnWidth(col As Integer, widthPoints As Double)
+		  SetColumnWidthRaw(XLSXHelpers.ToInternalIndex(col), widthPoints)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 486569676874206F66206120312D626173656420726F7720696E20706F696E74732C206F7220302069662069742075736573207468652073686565742064656661756C742E0A
+		Function RowHeight(row As Integer) As Double
+		  Return RowHeightRaw(XLSXHelpers.ToInternalIndex(row))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 53657420286F7220636C6561722C207768656E203C3D203029206120312D626173656420726F7727732068656967687420696E20706F696E74732E0A
+		Sub SetRowHeight(row As Integer, heightPoints As Double)
+		  SetRowHeightRaw(XLSXHelpers.ToInternalIndex(row), heightPoints)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 5265636F72642061206D65726765642072656374616E676C652028312D62617365642C20696E636C75736976652920616E6420666C616720657665727920636F76657265642063656C6C206578636570742074686520616E63686F722E0A
+		Sub AddMergedRange(firstRow As Integer, firstCol As Integer, lastRow As Integer, lastCol As Integer)
+		  ' Corners in the caller's index base.
+		  AddMergedRangeRaw(XLSXHelpers.ToInternalIndex(firstRow), XLSXHelpers.ToInternalIndex(firstCol), XLSXHelpers.ToInternalIndex(lastRow), XLSXHelpers.ToInternalIndex(lastCol))
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 52657475726E73205472756520666F722063656C6C7320696E736964652061206D65726765642072616E6765207468617420617265204E4F542074686520746F702D6C65667420616E63686F722E20557365207468697320746F206C656176652063656C6C7320626C616E6B207768656E2066696C6C696E672061204C697374626F782E0A
+		Function IsCellMergedFollower(row As Integer, col As Integer) As Boolean
+		  Return IsCellMergedFollowerRaw(XLSXHelpers.ToInternalIndex(row), XLSXHelpers.ToInternalIndex(col))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 52656E646572207374796C6520666F722028726F772C20636F6C293A20616E206578706C696369742063656C6C207374796C652077696E732C20656C736520616E20656E636C6F73696E6720457863656C205461626C652773206275696C742D696E207374796C6520737570706C6965732061206865616465722066696C6C202F2062616E6465642D726F772074696E742E204E65766572204E696C2E0A
+		Function EffectiveStyle(row As Integer, col As Integer) As XLSXCellStyle
+		  Return EffectiveStyleRaw(XLSXHelpers.ToInternalIndex(row), XLSXHelpers.ToInternalIndex(col))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function AutoFitColumn(col As Integer, charWidthPx As Double = 7.0) As Double
+		  Return AutoFitColumnRaw(XLSXHelpers.ToInternalIndex(col), charWidthPx)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 45766572792063656C6C206F66206120726F772C206C65667420746F2072696768742C20617320616E20617272617920757361626C65206469726563746C79207769746820466F7220456163682E20416C7761797320436F6C436F756E74206C6F6E673B20616273656E742063656C6C7320617265207468652073686172656420656D7074792073656E74696E656C2E0A
+		Function RowCells(row As Integer) As XLSXCell()
+		  ' Every cell of a row, left to right — a plain array, so it works directly
+		  ' with For Each:  For Each c As XLSXCell In sheet.RowCells(r)
+		  Return RowCellsRaw(XLSXHelpers.ToInternalIndex(row))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 45766572792063656C6C206F6620616E20616C726561647920312D626173656420726F772C206C65667420746F2072696768742C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Function RowCellsRaw(row As Integer) As XLSXCell()
+		  ' Same, for an already 1-based row. Absent cells come back as the shared
+		  ' empty sentinel, so the array is always ColCount long and never Nil.
+		  Var arr() As XLSXCell
+		  For c As Integer = 1 To mMaxCol
+		    arr.Add CellAtRaw(row, c)
+		  Next
+		  Return arr
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 45766572792063656C6C206F66206120636F6C756D6E2C20746F7020746F20626F74746F6D2C20617320616E20617272617920757361626C65206469726563746C79207769746820466F7220456163682E20416C7761797320526F77436F756E74206C6F6E672E0A
+		Function ColumnCells(col As Integer) As XLSXCell()
+		  ' Every cell of a column, top to bottom:
+		  '   For Each c As XLSXCell In sheet.ColumnCells(c)
+		  Return ColumnCellsRaw(XLSXHelpers.ToInternalIndex(col))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 45766572792063656C6C206F6620616E20616C726561647920312D626173656420636F6C756D6E2C20746F7020746F20626F74746F6D2C20627970617373696E6720696E646578207472616E736C6174696F6E2E0A
+		Function ColumnCellsRaw(col As Integer) As XLSXCell()
+		  ' Same, for an already 1-based column. Always RowCount long, never Nil.
+		  Var arr() As XLSXCell
+		  For r As Integer = 1 To mMaxRow
+		    arr.Add CellAtRaw(r, col)
+		  Next
+		  Return arr
+		End Function
+	#tag EndMethod
 
 	#tag Note, Name = About
 		One parsed worksheet from an XLSX archive.

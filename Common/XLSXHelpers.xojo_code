@@ -80,7 +80,7 @@ Protected Module XLSXHelpers
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 457874656E73696F6E206D6574686F643A2072657475726E73207468652073796D626F6C6963206E616D65206F6620616E20654F70656E4D6F64652028224175746F222C20224D656D6F7279222C20224469736B22292E0A
 		Function ToString(Extends m As XLSXEnums.eOpenMode) As String
 		  Select Case m
 		  Case XLSXEnums.eOpenMode.Auto
@@ -127,13 +127,16 @@ Protected Module XLSXHelpers
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 436F6E7665727420616E20457863656C20636F6C756D6E207769647468202864656661756C742D666F6E742063686172616374657220756E6974732920746F20706F696E74732028746865206D6F64656C27732063616E6F6E6963616C20636F6C756D6E2D776964746820756E6974292E0A
-		Function ColumnCharsToPoints(chars As Double) As Double
+	#tag Method, Flags = &h0, Description = 436F6E7665727420616E20457863656C20636F6C756D6E20776964746820696E2063686172616374657220756E69747320746F20706F696E74732E206368617257696474685078206F7665727269646573207468652064656661756C74203720706978656C2070657220636861726163746572206D657472696320746F206D6174636820616E6F7468657220666F6E742E0A
+		Function ColumnCharsToPoints(chars As Double, charWidthPx As Double = 7.0) As Double
 		  ' Excel column width is measured in the default font's "max digit width"
 		  ' (~7px for Calibri 11) + 5px cell padding; 1px = 0.75pt at 96 DPI.
 		  ' Canonical column-width unit in the model is points.
+		  ' charWidthPx lets a caller substitute the metric of the font they actually
+		  ' render in — a wider face needs a bigger number (see AutoFitColumn).
 		  If chars <= 0 Then Return 0.0
-		  Return ((chars * 7.0) + 5.0) * 0.75
+		  Var w As Double = If(charWidthPx > 0, charWidthPx, 7.0)
+		  Return ((chars * w) + 5.0) * 0.75
 		End Function
 	#tag EndMethod
 
@@ -278,7 +281,7 @@ Protected Module XLSXHelpers
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 436F6E7665727420616E20457863656C20523143312072656C617469766520666F726D756C6120746F2041312C20616E63686F7265642061742028637572526F772C20637572436F6C292E204F6E6C79207265666572656E636520746F6B656E73206172652072657772697474656E2E0A
 		Function FormulaToA1(formula As String, curRow As Integer, curCol As Integer) As String
 		  ' Convert a formula written in Excel R1C1 relative notation into A1 notation,
 		  ' anchored at (curRow, curCol). Only R1C1 reference tokens are rewritten; the
@@ -320,7 +323,7 @@ Protected Module XLSXHelpers
 		  If col < 1 Then col = 1
 		  Var s As String
 		  If colAbs Then s = s + "$"
-		  s = s + XLSXCellRef.IndexToColLetters(col)
+		  s = s + XLSXCellRef.IndexToColLettersRaw(col)
 		  If rowAbs Then s = s + "$"
 		  s = s + Str(row)
 		  Return s
@@ -342,7 +345,7 @@ Protected Module XLSXHelpers
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 436F6E7665727420616E20413120666F726D756C6120696E746F204F4446204F70656E466F726D756C6120666F726D20666F722061202E6F6473207461626C653A666F726D756C612028726566732077726170706564206173205B2E41315D2C2070726566697865642077697468206F663A3D292E0A
 		Function A1ToOdfFormula(a1 As String) As String
 		  ' Convert an A1-notation formula into ODF (OpenFormula) form for a .ods
 		  ' table:formula attribute: cell/range refs wrapped as [.A1] / [.A1:.B2]
@@ -378,7 +381,7 @@ Protected Module XLSXHelpers
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 436F6E766572742061202E6F6473207461626C653A666F726D756C6120284F444629206261636B20746F2041313A20737472697020746865206F663A3D202F206F6F6F633A3D202F203D2070726566697820616E6420756E7772617020746865205B2E41315D207265666572656E6365732E0A
 		Function OdfFormulaToA1(odf As String) As String
 		  ' Convert a .ods table:formula (ODF/OpenFormula) back into A1 notation:
 		  ' strip the of:= / oooc:= / = prefix and unwrap [.A1] / [Sheet.A1] refs.
@@ -438,6 +441,44 @@ Protected Module XLSXHelpers
 		  Return ""
 		End Function
 	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 506F696E747320746F2073637265656E20706978656C73206174203936204450492E20436F6C756D6E20776964746873206172652073746F72656420696E20706F696E74733B206C697374626F7820436F6C756D6E5769647468732061726520706978656C732E0A
+		Function PointsToPixels(points As Double) As Double
+		  ' Points -> screen pixels at 96 DPI (1pt = 4/3 px). The model stores column
+		  ' widths in points; listbox ColumnWidths are pixels.
+		  Return points * 4.0 / 3.0
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 53637265656E20706978656C7320746F20706F696E7473206174203936204450492E20496E7665727365206F6620506F696E7473546F506978656C732E0A
+		Function PixelsToPoints(pixels As Double) As Double
+		  ' Screen pixels -> points at 96 DPI (1px = 0.75pt). Inverse of PointsToPixels.
+		  Return pixels * 0.75
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 5472616E736C61746520612063616C6C65722D737570706C6965642073686565742F726F772F636F6C756D6E20696E64657820696E746F20746865206D6F64656C277320696E7465726E616C20312D626173656420636F6F7264696E6174652E204964656E7469747920756E6C65737320675A65726F4261736564536865657473526F7773436F6C756D6E7320697320547275652E0A
+		Function ToInternalIndex(publicIndex As Integer) As Integer
+		  ' Translate a caller-supplied sheet/row/column index into the model's
+		  ' internal 1-based coordinate. A no-op unless gZeroBasedSheetsRowsColumns
+		  ' is True, so flag-off behaviour is byte-identical to before the flag existed.
+		  If gZeroBasedSheetsRowsColumns Then Return publicIndex + 1
+		  Return publicIndex
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 496E7665727365206F6620546F496E7465726E616C496E6465783A20616E20696E7465726E616C20312D626173656420636F6F7264696E6174652065787072657373656420696E207468652063616C6C6572277320696E64657820626173652E0A
+		Function ToPublicIndex(internalIndex As Integer) As Integer
+		  ' Inverse of ToInternalIndex: an internal 1-based coordinate as the caller
+		  ' expects to see it. Also a no-op while the flag is False.
+		  If gZeroBasedSheetsRowsColumns Then Return internalIndex - 1
+		  Return internalIndex
+		End Function
+	#tag EndMethod
+
+	#tag Property, Flags = &h0, Description = 476C6F62616C207377697463683A207768656E205472756520746865207075626C69632041504920616464726573736573207368656574732C20726F777320616E6420636F6C756D6E732066726F6D203020696E7374656164206F6620457863656C277320312E2046616C73652062792064656661756C742C20616E642061206E6F2D6F70207768656E2046616C73652E0A
+		gZeroBasedSheetsRowsColumns As Boolean = False
+	#tag EndProperty
 
 	#tag Note, Name = About
 		Project-wide helpers for the XLSX parser. Add new helper functions here rather

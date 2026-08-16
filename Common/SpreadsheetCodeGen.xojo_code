@@ -1,6 +1,6 @@
 #tag Module
 Protected Module SpreadsheetCodeGen
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 456D697420586F6A6F20736F7572636520666F722061206D6574686F6420746861742072656275696C64732074686520776F726B626F6F6B207669612074686520666C75656E7420617574686F72696E67204150493B2072657475726E732074686520636F6D706C6574652046756E6374696F6E20617320746578742E0A
 		Function Generate(wb As XLSXWorkbook, methodName As String = "BuildWorkbook") As String
 		  ' Emit Xojo source for a method that rebuilds `wb` using the fluent authoring
 		  ' API (XLSXWorkbook.AddSheet + XLSXSheet.Put* + XLSXCell style mutators). The
@@ -14,7 +14,7 @@ Protected Module SpreadsheetCodeGen
 		  L.Add "  Var wb As New XLSXWorkbook(" + XojoStr(wb.SourceName) + ")"
 		  L.Add ""
 		  For s As Integer = 1 To wb.SheetCount
-		    Var sheet As XLSXSheet = wb.SheetAt(s)
+		    Var sheet As XLSXSheet = wb.SheetAtRaw(s)
 		    Var v As String = "ws" + Str(s)
 		    L.Add "  // --- Sheet: " + sheet.Name + " ---"
 		    L.Add "  Var " + v + " As XLSXSheet = wb.AddSheet(" + XojoStr(sheet.Name) + ")"
@@ -25,13 +25,13 @@ Protected Module SpreadsheetCodeGen
 		      Next
 		    Next
 		    For c As Integer = 1 To sheet.ColCount
-		      Var w As Double = sheet.ColumnWidth(c)
-		      If w > 0 Then L.Add "  " + v + ".SetColumnWidth(" + Str(c) + ", " + Str(w) + ")"
+		      Var w As Double = sheet.ColumnWidthRaw(c)
+		      If w > 0 Then L.Add "  " + v + ".SetColumnWidth(" + Str(XLSXHelpers.ToPublicIndex(c)) + ", " + Str(w) + ")"
 		    Next
 		    For i As Integer = 0 To sheet.MergedRangeCount - 1
 		      Var rng As XLSXCellRange = sheet.MergedRangeAt(i)
 		      If rng Is Nil Then Continue
-		      L.Add "  " + v + ".AddMergedRange(" + Str(rng.FirstRow) + ", " + Str(rng.FirstCol) + ", " + Str(rng.LastRow) + ", " + Str(rng.LastCol) + ")"
+		      L.Add "  " + v + ".AddMergedRange(" + Str(XLSXHelpers.ToPublicIndex(rng.FirstRowRaw)) + ", " + Str(XLSXHelpers.ToPublicIndex(rng.FirstColRaw)) + ", " + Str(XLSXHelpers.ToPublicIndex(rng.LastRowRaw)) + ", " + Str(XLSXHelpers.ToPublicIndex(rng.LastColRaw)) + ")"
 		    Next
 		    L.Add ""
 		  Next
@@ -44,10 +44,10 @@ Protected Module SpreadsheetCodeGen
 	#tag Method, Flags = &h21
 		Function EmitCell(v As String, sheet As XLSXSheet, styles As XLSXStyles, r As Integer, c As Integer) As String
 		  ' One Put* statement for the cell at (r,c), or empty for a cell that needs none.
-		  Var cell As XLSXCell = sheet.CellAt(r, c)
+		  Var cell As XLSXCell = sheet.CellAtRaw(r, c)
 		  If cell.IsEmpty Then Return ""
-		  If sheet.IsCellMergedFollower(r, c) Then Return ""
-		  Var pos As String = "(" + Str(r) + ", " + Str(c) + ", "
+		  If sheet.IsCellMergedFollowerRaw(r, c) Then Return ""
+		  Var pos As String = "(" + Str(XLSXHelpers.ToPublicIndex(r)) + ", " + Str(XLSXHelpers.ToPublicIndex(c)) + ", "
 		  Var stmt As String
 		  Select Case cell.eType
 		  Case XLSXEnums.eCellType.Str, XLSXEnums.eCellType.ErrorVal

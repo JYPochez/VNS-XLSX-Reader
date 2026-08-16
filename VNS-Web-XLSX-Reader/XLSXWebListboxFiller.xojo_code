@@ -13,9 +13,9 @@ Protected Module XLSXWebListboxFiller
 		  If sheet.HasColumnWidths Then
 		    Var widthParts() As String
 		    For c As Integer = 1 To cols
-		      Var wpt As Double = sheet.ColumnWidth(c)
+		      Var wpt As Double = sheet.ColumnWidthRaw(c)
 		      If wpt > 0 Then
-		        widthParts.Add Str(Round(wpt * 4.0 / 3.0))
+		        widthParts.Add Str(Round(XLSXHelpers.PointsToPixels(wpt)) + CellPaddingPixels)
 		      Else
 		        widthParts.Add "*"
 		      End If
@@ -34,14 +34,14 @@ Protected Module XLSXWebListboxFiller
 		  Var firstDataRow As Integer
 		  If Not promoteHeader Then
 		    For c As Integer = 1 To cols
-		      lb.HeaderAt(c - 1) = XLSXCellRef.IndexToColLetters(c)
+		      lb.HeaderAt(c - 1) = XLSXCellRef.IndexToColLettersRaw(c)
 		    Next
 		    firstDataRow = 1
 		  Else
 		    Var headerRow As Integer = FindFirstNonEmptyRow(sheet)
 		    If headerRow = 0 Then Return
 		    For c As Integer = 1 To cols
-		      Var hc As XLSXCell = sheet.CellAt(headerRow, c)
+		      Var hc As XLSXCell = sheet.CellAtRaw(headerRow, c)
 		      lb.HeaderAt(c - 1) = If(showFormulas And hc.HasFormula, hc.FormulaText, hc.DisplayText(styles))
 		    Next
 		    firstDataRow = headerRow + 1
@@ -56,10 +56,10 @@ Protected Module XLSXWebListboxFiller
 		    Var rowTexts() As String
 		    For c As Integer = 1 To cols
 		      Var text As String
-		      If sheet.IsCellMergedFollower(r, c) Then
+		      If sheet.IsCellMergedFollowerRaw(r, c) Then
 		        text = ""
 		      Else
-		        Var dc As XLSXCell = sheet.CellAt(r, c)
+		        Var dc As XLSXCell = sheet.CellAtRaw(r, c)
 		        text = If(showFormulas And dc.HasFormula, dc.FormulaText, dc.DisplayText(styles))
 		      End If
 		      rowTexts.Add text
@@ -73,8 +73,8 @@ Protected Module XLSXWebListboxFiller
 		      lb.CellTextAt(lbRow, c) = rowTexts(c)
 		      ' Apply a styled cell renderer for non-default cells (WebStyle has no
 		      ' alignment, so numeric right-align isn't reproduced on the Web).
-		      If Not sheet.IsCellMergedFollower(r, c + 1) Then
-		        Var st As XLSXCellStyle = sheet.EffectiveStyle(r, c + 1)
+		      If Not sheet.IsCellMergedFollowerRaw(r, c + 1) Then
+		        Var st As XLSXCellStyle = sheet.EffectiveStyleRaw(r, c + 1)
 		        If st <> Nil And Not st.IsDefault Then
 		          lb.CellRendererAt(lbRow, c) = New WebListBoxStyleRenderer(WebStyleFor(st), rowTexts(c))
 		        End If
@@ -95,7 +95,8 @@ Protected Module XLSXWebListboxFiller
 		  If st.Italic Then s.Italic = True
 		  If st.Underline Then s.Underline = True
 		  If st.FontName <> "" Then s.FontName = st.FontName
-		  If st.FontSize > 0 Then s.FontSize = st.FontSize
+		  ' WebStyle.FontSize is in PIXELS (CSS); the model stores points.
+		  If st.FontSize > 0 Then s.FontSize = XLSXHelpers.PointsToPixels(st.FontSize)
 		  If st.HasAnyBorder Then
 		    s.BorderColor = If(st.HasBorderColor, st.BorderColor, Color.RGB(0, 0, 0))
 		    s.BorderThickness = MaxBorderThickness(st)
@@ -141,7 +142,7 @@ Protected Module XLSXWebListboxFiller
 		  Var hr As Integer = FindFirstNonEmptyRow(sheet)
 		  If hr <= 0 Then Return False
 		  For c As Integer = 1 To sheet.ColCount
-		    If Not sheet.EffectiveStyle(hr, c).IsDefault Then Return True
+		    If Not sheet.EffectiveStyleRaw(hr, c).IsDefault Then Return True
 		  Next
 		  Return False
 		End Function
@@ -152,7 +153,7 @@ Protected Module XLSXWebListboxFiller
 		  Var maxProbe As Integer = Min(sheet.RowCount, 50)
 		  For r As Integer = 1 To maxProbe
 		    For c As Integer = 1 To sheet.ColCount
-		      If Not sheet.CellAt(r, c).IsEmpty Then Return r
+		      If Not sheet.CellAtRaw(r, c).IsEmpty Then Return r
 		    Next
 		  Next
 		  Return 1
@@ -166,10 +167,23 @@ Protected Module XLSXWebListboxFiller
 		  ' firstDataRow - 1 when there is no body content at all.
 		  For r As Integer = sheet.RowCount DownTo firstDataRow
 		    For c As Integer = 1 To cols
-		      If Not sheet.CellAt(r, c).IsEmpty Then Return r
+		      If Not sheet.CellAtRaw(r, c).IsEmpty Then Return r
 		    Next
 		  Next
 		  Return firstDataRow - 1
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 446973706C61792D6F6E6C7920706978656C7320616464656420746F2065766572792057656220636F6C756D6E20776964746820746F20616C6C6F7720666F7220746865206C697374626F782063656C6C2070616464696E6720616E6420612077696465722066616C6C6261636B20666F6E742E204E65766572207772697474656E206261636B20746F20746865206D6F64656C2E0A
+		Function CellPaddingPixels() As Integer
+		  ' Display-only allowance added to every column width on the Web.
+		  ' A width from the model (or from Auto-fit) is measured in Excel's
+		  ' Calibri-11 metric, but the browser adds its own cell padding and
+		  ' usually substitutes a wider fallback face (Calibri is absent on most
+		  ' macOS/Linux browsers), so the text ellipsises in a column that fits
+		  ' on paper. Never written back to the model, so the saved file keeps
+		  ' the true width.
+		  Return 28
 		End Function
 	#tag EndMethod
 

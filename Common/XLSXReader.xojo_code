@@ -175,7 +175,7 @@ Protected Module XLSXReader
 
 		  Var name As String = tn.GetAttribute("displayName")
 		  If name = "" Then name = tn.GetAttribute("name")
-		  Var tbl As New XLSXTable(name, fr, fc, lr, lc)
+		  Var tbl As XLSXTable = XLSXTable.NewRaw(name, fr, fc, lr, lc)
 
 		  Var hrc As String = tn.GetAttribute("headerRowCount")
 		  If hrc <> "" Then tbl.HeaderRowCount = hrc.ToInteger   ' absent => default 1
@@ -201,7 +201,7 @@ Protected Module XLSXReader
 		  Var parts() As String = ref.Split(":")
 		  If parts.LastIndex < 0 Then Return False
 		  Var r1, c1 As Integer
-		  If Not XLSXCellRef.A1ToRowCol(parts(0), r1, c1) Then Return False
+		  If Not XLSXCellRef.A1ToRowColRaw(parts(0), r1, c1) Then Return False
 		  If parts.LastIndex = 0 Then
 		    fr = r1
 		    fc = c1
@@ -210,7 +210,7 @@ Protected Module XLSXReader
 		    Return True
 		  End If
 		  Var r2, c2 As Integer
-		  If Not XLSXCellRef.A1ToRowCol(parts(1), r2, c2) Then Return False
+		  If Not XLSXCellRef.A1ToRowColRaw(parts(1), r2, c2) Then Return False
 		  fr = Min(r1, r2)
 		  fc = Min(c1, c2)
 		  lr = Max(r1, r2)

@@ -56,7 +56,8 @@ Protected Module ODSReader
 		  Var dataStyles As New Dictionary
 		  Var colStyleWidths As New Dictionary
 		  Var rowStyleHeights As New Dictionary
-		  ParseStyles(doc, cellStyles, dataStyles, colStyleWidths, rowStyleHeights)
+		  Var cellVisualStyles As New Dictionary
+		  ParseStyles(doc, cellStyles, dataStyles, colStyleWidths, rowStyleHeights, cellVisualStyles)
 
 		  ' styles.xml may carry additional named / data styles.
 		  Var stylesXml As String = zip.ReadPart("styles.xml")
@@ -64,7 +65,7 @@ Protected Module ODSReader
 		    Var sdoc As New XmlDocument
 		    Try
 		      sdoc.LoadXml(stylesXml)
-		      ParseStyles(sdoc, cellStyles, dataStyles, colStyleWidths, rowStyleHeights)
+		      ParseStyles(sdoc, cellStyles, dataStyles, colStyleWidths, rowStyleHeights, cellVisualStyles)
 		    Catch
 		      ' styles.xml is optional polish; ignore a malformed one.
 		    End Try
@@ -72,7 +73,7 @@ Protected Module ODSReader
 
 		  Var tables As XmlNodeList = doc.Xql("//*[local-name()='spreadsheet']/*[local-name()='table']")
 		  For i As Integer = 0 To tables.Length - 1
-		    Var sheet As XLSXSheet = ParseTable(tables.Item(i), i + 1, cellStyles, dataStyles, colStyleWidths, rowStyleHeights)
+		    Var sheet As XLSXSheet = ParseTable(tables.Item(i), i + 1, cellStyles, dataStyles, colStyleWidths, rowStyleHeights, cellVisualStyles)
 		    wb.AddSheet(sheet)
 		  Next
 
@@ -81,7 +82,7 @@ Protected Module ODSReader
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 4275696C6420616E20584C535853686565742066726F6D206F6E65207461626C653A7461626C652C20686F6E6F72696E67206E756D6265722D636F6C756D6E732F726F77732D726570656174656420616E6420636F6C756D6E2F726F77207370616E7320286D65726765642063656C6C73292E0A
-		Private Function ParseTable(tableNode As XmlNode, tabIndex As Integer, cellStyles As Dictionary, dataStyles As Dictionary, colStyleWidths As Dictionary, rowStyleHeights As Dictionary) As XLSXSheet
+		Private Function ParseTable(tableNode As XmlNode, tabIndex As Integer, cellStyles As Dictionary, dataStyles As Dictionary, colStyleWidths As Dictionary, rowStyleHeights As Dictionary, cellVisualStyles As Dictionary) As XLSXSheet
 		  Var name As String = tableNode.GetAttribute("table:name")
 		  Var sheet As New XLSXSheet(name, tabIndex)
 
@@ -102,7 +103,7 @@ Protected Module ODSReader
 		        Var reps As Integer = Min(rep, 4096)
 		        For k As Integer = 1 To reps
 		          colIndex = colIndex + 1
-		          sheet.SetColumnWidth(colIndex, wpt)
+		          sheet.SetColumnWidthRaw(colIndex, wpt)
 		        Next
 		        If rep > reps Then colIndex = colIndex + (rep - reps)
 		      End If
@@ -144,7 +145,7 @@ Protected Module ODSReader
 		        Var rowSpan As Integer = IntAttr(cellNode, "table:number-rows-spanned", 1)
 
 		        Var cell As XLSXCell
-		        If Not isCovered Then cell = MakeCell(cellNode, cellStyles, dataStyles)
+		        If Not isCovered Then cell = MakeCell(cellNode, cellStyles, dataStyles, cellVisualStyles)
 
 		        If cell Is Nil Then
 		          ' Empty or covered cell: advance the column counter arithmetically.
@@ -170,11 +171,11 @@ Protected Module ODSReader
 		      Var emitRows As Integer = Min(rowRepeat, 4096)
 		      For iter As Integer = 0 To emitRows - 1
 		        Var rr As Integer = rowIdx + 1 + iter
-		        If rowHpt > 0 Then sheet.SetRowHeight(rr, rowHpt)
+		        If rowHpt > 0 Then sheet.SetRowHeightRaw(rr, rowHpt)
 		        For p As Integer = 0 To planCols.LastIndex
-		          sheet.PutCell(rr, planCols(p), planCells(p))
+		          sheet.PutCellRaw(rr, planCols(p), planCells(p))
 		          If planColSpan(p) > 1 Or planRowSpan(p) > 1 Then
-		            sheet.AddMergedRange(rr, planCols(p), rr + planRowSpan(p) - 1, planCols(p) + planColSpan(p) - 1)
+		            sheet.AddMergedRangeRaw(rr, planCols(p), rr + planRowSpan(p) - 1, planCols(p) + planColSpan(p) - 1)
 		          End If
 		        Next
 		      Next
@@ -188,7 +189,7 @@ Protected Module ODSReader
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 5475726E206F6E65207461626C653A7461626C652D63656C6C20696E746F20616E20584C535843656C6C20286F72204E696C20696620656D707479292E204D617073206F66666963653A76616C75652D7479706520746F206543656C6C5479706520616E64207265736F6C7665732074686520666F726D617420636F64652E0A
-		Private Function MakeCell(cellNode As XmlNode, cellStyles As Dictionary, dataStyles As Dictionary) As XLSXCell
+		Private Function MakeCell(cellNode As XmlNode, cellStyles As Dictionary, dataStyles As Dictionary, cellVisualStyles As Dictionary) As XLSXCell
 		  ' Returns a populated XLSXCell, or Nil for a truly-empty cell.
 		  Var valueType As String = cellNode.GetAttribute("office:value-type")
 		  Var styleName As String = cellNode.GetAttribute("table:style-name")
@@ -246,6 +247,9 @@ Protected Module ODSReader
 		  If hasFormula And eType = XLSXEnums.eCellType.FormulaCached Then
 		    cell.Formula = XLSXHelpers.OdfFormulaToA1(cellNode.GetAttribute("table:formula"))
 		  End If
+		  If styleName <> "" And cellVisualStyles.HasKey(styleName) Then
+		    cell.CellStyle = cellVisualStyles.Value(styleName)
+		  End If
 		  Return cell
 		End Function
 	#tag EndMethod
@@ -261,7 +265,7 @@ Protected Module ODSReader
 	#tag EndMethod
 
 	#tag Method, Flags = &h21, Description = 4275696C642063656C6C5374796C654E616D65202D3E20646174615374796C654E616D6520616E6420646174615374796C654E616D65202D3E20666F726D61742D636F6465206D6170732066726F6D206120636F6E74656E742E786D6C206F72207374796C65732E786D6C20646F63756D656E742E0A
-		Private Sub ParseStyles(doc As XmlDocument, cellStyles As Dictionary, dataStyles As Dictionary, colStyleWidths As Dictionary, rowStyleHeights As Dictionary)
+		Private Sub ParseStyles(doc As XmlDocument, cellStyles As Dictionary, dataStyles As Dictionary, colStyleWidths As Dictionary, rowStyleHeights As Dictionary, cellVisualStyles As Dictionary)
 		  ' Data styles: number / date / time / currency / percentage styles -> format code.
 		  ' One query per type (avoids relying on an XPath 'or' predicate).
 		  Var typeNames() As String = Array("number-style", "date-style", "time-style", "currency-style", "percentage-style")
@@ -286,6 +290,8 @@ Protected Module ODSReader
 		    Case "table-cell"
 		      Var dn As String = s.GetAttribute("style:data-style-name")
 		      If dn <> "" Then cellStyles.Value(nm) = dn
+		      Var vis As XLSXCellStyle = ParseCellVisualStyle(s)
+		      If vis <> Nil Then cellVisualStyles.Value(nm) = vis
 		    Case "table-column"
 		      Var props As XmlNodeList = s.Xql("./*[local-name()='table-column-properties']")
 		      If props.Length > 0 Then
@@ -574,6 +580,137 @@ Protected Module ODSReader
 		  Var i As Integer = nm.IndexOf(":")
 		  If i >= 0 Then Return nm.Middle(i + 1)
 		  Return nm
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function ParseCellVisualStyle(styleNode As XmlNode) As XLSXCellStyle
+		  ' Read a table-cell <style:style>'s visual properties into an XLSXCellStyle,
+		  ' inverting what ODSWriter emits. Returns Nil when nothing visual is set.
+		  Var st As New XLSXCellStyle
+
+		  Var cp As XmlNodeList = styleNode.Xql("./*[local-name()='table-cell-properties']")
+		  If cp.Length > 0 Then
+		    Var n As XmlNode = cp.Item(0)
+		    Var bg As String = n.GetAttribute("fo:background-color")
+		    If bg <> "" And bg <> "transparent" Then
+		      st.BackgroundColor = OdsColorToColor(bg)
+		      st.HasBackground = True
+		    End If
+		    ' Borders: per-edge, falling back to the fo:border shorthand (all edges).
+		    Var sh As String = n.GetAttribute("fo:border")
+		    ApplyOdsBorder(st, "L", EdgeOr(n, "fo:border-left", sh))
+		    ApplyOdsBorder(st, "R", EdgeOr(n, "fo:border-right", sh))
+		    ApplyOdsBorder(st, "T", EdgeOr(n, "fo:border-top", sh))
+		    ApplyOdsBorder(st, "B", EdgeOr(n, "fo:border-bottom", sh))
+		    Select Case n.GetAttribute("style:vertical-align")
+		    Case "top"
+		      st.AlignV = XLSXEnums.eAlignV.Top
+		    Case "middle"
+		      st.AlignV = XLSXEnums.eAlignV.Middle
+		    End Select
+		    If n.GetAttribute("fo:wrap-option") = "wrap" Then st.WrapText = True
+		  End If
+
+		  Var pp As XmlNodeList = styleNode.Xql("./*[local-name()='paragraph-properties']")
+		  If pp.Length > 0 Then
+		    Select Case pp.Item(0).GetAttribute("fo:text-align")
+		    Case "start", "left"
+		      st.AlignH = XLSXEnums.eAlignH.Left
+		    Case "center"
+		      st.AlignH = XLSXEnums.eAlignH.Center
+		    Case "end", "right"
+		      st.AlignH = XLSXEnums.eAlignH.Right
+		    End Select
+		  End If
+
+		  Var tp As XmlNodeList = styleNode.Xql("./*[local-name()='text-properties']")
+		  If tp.Length > 0 Then
+		    Var n As XmlNode = tp.Item(0)
+		    If n.GetAttribute("fo:font-weight") = "bold" Then st.Bold = True
+		    If n.GetAttribute("fo:font-style") = "italic" Then st.Italic = True
+		    Var us As String = n.GetAttribute("style:text-underline-style")
+		    If us <> "" And us <> "none" Then st.Underline = True
+		    Var fc As String = n.GetAttribute("fo:color")
+		    If fc <> "" Then
+		      st.FontColor = OdsColorToColor(fc)
+		      st.HasFontColor = True
+		    End If
+		    Var fsz As String = n.GetAttribute("fo:font-size")
+		    If fsz <> "" Then st.FontSize = OdsFontSizeToPoints(fsz)
+		    Var ff As String = n.GetAttribute("fo:font-family")
+		    If ff <> "" Then st.FontName = ff
+		  End If
+
+		  If st.IsDefault Then Return Nil
+		  Return st
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function EdgeOr(n As XmlNode, attr As String, fallback As String) As String
+		  ' The per-edge border attribute if present, else the fo:border shorthand.
+		  Var v As String = n.GetAttribute(attr)
+		  If v <> "" Then Return v
+		  Return fallback
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Sub ApplyOdsBorder(st As XLSXCellStyle, edge As String, value As String)
+		  ' value like "0.5pt solid #rrggbb"; set the edge style + a border colour.
+		  If value = "" Or value = "none" Then Return
+		  Var parts() As String = value.Split(" ")
+		  If parts.Count = 0 Then Return
+		  Var bs As XLSXEnums.eBorderStyle = OdsWidthToBorderStyle(parts(0))
+		  Select Case edge
+		  Case "L"
+		    st.BorderLeft = bs
+		  Case "R"
+		    st.BorderRight = bs
+		  Case "T"
+		    st.BorderTop = bs
+		  Case "B"
+		    st.BorderBottom = bs
+		  End Select
+		  For Each p As String In parts
+		    If p.Left(1) = "#" Then
+		      st.BorderColor = OdsColorToColor(p)
+		      st.HasBorderColor = True
+		    End If
+		  Next
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function OdsWidthToBorderStyle(w As String) As XLSXEnums.eBorderStyle
+		  ' Map an ODS border width to our 4-level style (writer emits 0.5/1/2 pt).
+		  Var pt As Double = XLSXHelpers.OdsLengthToPoints(w)
+		  If pt < 0.9 Then Return XLSXEnums.eBorderStyle.Thin
+		  If pt < 1.6 Then Return XLSXEnums.eBorderStyle.Medium
+		  Return XLSXEnums.eBorderStyle.Thick
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function OdsColorToColor(hexIn As String) As Color
+		  ' "#rrggbb" -> Color. Returns black on malformed input.
+		  Var h As String = hexIn
+		  If h.Left(1) = "#" Then h = h.Middle(1)
+		  If h.Length < 6 Then Return &c000000
+		  Var r As Integer = Val("&h" + h.Middle(0, 2))
+		  Var g As Integer = Val("&h" + h.Middle(2, 2))
+		  Var b As Integer = Val("&h" + h.Middle(4, 2))
+		  Return RGB(r, g, b)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Function OdsFontSizeToPoints(sz As String) As Double
+		  ' "11pt" -> 11.0 (also tolerates a bare number).
+		  Var t As String = sz
+		  If t.Right(2).Lowercase = "pt" Then t = t.Left(t.Length - 2)
+		  Return t.ToDouble
 		End Function
 	#tag EndMethod
 

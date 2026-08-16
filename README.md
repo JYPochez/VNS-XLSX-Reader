@@ -1,7 +1,7 @@
 # VNS XLSX Reader
 
 [![Xojo](https://img.shields.io/badge/Xojo-2026r1-blue)](https://www.xojo.com)
-[![Version](https://img.shields.io/badge/version-0.4.0-green)](version_history.md)
+[![Version](https://img.shields.io/badge/version-0.6.0-green)](version_history.md)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
@@ -19,12 +19,14 @@ Open any Excel or OpenDocument workbook → one tab per sheet → cell values re
 - 🆕 **Create a sheet from scratch** — the **New** button opens an empty editable grid, and **+ Row / − Row / + Col / − Col** buttons grow or shrink the sheet (they work on opened files too). Save it as `.xlsx` or `.ods` like any workbook.
 - 💾 **Save / export to `.xlsx` AND `.ods`** — from either app, in either format (full cross-format conversion). Desktop uses the native save dialog (on macOS the two file types appear as a real *Format* popup); Web offers a format picker + browser download. Powered by a pure-Xojo in-memory zip writer (`MemoryBlock.Compress` + own CRC-32; ODS `mimetype` first and stored, per spec).
 - 🎨 **Cell styling** (whole-cell) — fonts (bold/italic/underline/name/size/colour), fill backgrounds, alignment and per-edge borders are read, rendered on **Desktop and Web**, and written back to **`.xlsx` and `.ods`** (round-trips through a save). Colours resolve from direct RGB, **theme colours** (`theme` + `tint`, read from `theme1.xml`) and the legacy indexed palette.
-- 📊 **Excel Tables** — a table's built-in style (e.g. *TableStyleLight9*) is rendered with its coloured header and banded rows, generated from the style name × the workbook theme (the Microsoft financial sample renders as designed).
+- 📊 **Excel Tables** — a table's built-in style (e.g. *TableStyleLight9*) is rendered with its coloured header and banded rows, generated from the style name × the workbook theme (the Microsoft financial sample renders as designed) — and the table is **re-emitted as a real Excel Table** when you save to `.xlsx`.
 - 📑 **One tab per sheet**, picked from the workbook's sheet order.
-- 🔢 **Resolves cell types**: shared strings, numbers, booleans, errors, inline strings, formulas (cached values).
+- 🧮 **Formulas — read, write & author**: formula text is preserved through an open → edit → save → reopen round-trip (`.xlsx` and `.ods`), a **Show formulas** toggle flips the grid between cached values and `=…` text, and you can author them in code — including Excel **R1C1** relative notation, converted to A1 on save.
+- 🔢 **Resolves cell types**: shared strings, numbers, booleans, errors, inline strings, formulas.
 - 📅 **Excel format codes**: a pragmatic subset for numbers (`0`, `0.00`, `#,##0`, `#,##0.00`, `0%`, `0.00%`), **scientific** (`0.00E+00`), **accounting** (`_("$"* #,##0.00_)…` with parens for negatives), **currency tags** (`[$X-Y]`), and dates (`dd/mm/yyyy`, `yyyy-mm-dd`, `m/d/yy h:mm`, `hh:mm`, …); custom `numFmtId ≥ 164` from `styles.xml` honored.
 - 🔁 **Merged cells**: top-left anchor renders the value, follower cells stay blank.
-- 📏 **Auto-sized columns** with user-resizable dividers and horizontal scroll on the Desktop.
+- 📏 **Auto-fit column widths** — an **Auto-fit** button (Desktop + Web) sizes columns to their content, allowing for bold and larger fonts and skipping merged cells, and the result is written into the saved file. Columns stay user-resizable with horizontal scroll on the Desktop.
+- 🔟 **Optional 0-based indexing** — set `XLSXHelpers.gZeroBasedSheetsRowsColumns = True` and sheets, rows and columns are addressed from 0 instead of Excel's 1. Off by default, and a pure no-op when off.
 - 🌍 **Localizable strings** via Xojo Dynamic constants (the `strings` module).
 - ⚠️ **Typed errors** (`XLSXException` with an `eParseError` code) so UI code can show friendly messages.
 - 🔌 **Zero external dependencies** — uses only Xojo framework classes (`FolderItem.Unzip`, `XmlDocument`, `DateTime`).
@@ -145,9 +147,9 @@ The two `.xojo_project` files reference every `Common/*.xojo_code` via `Module=`
 
 | Out of scope | Workaround / status |
 |---|---|
-| Formula evaluation | Cached values are shown as-is; saving writes the cached value (formula text is not kept) |
-| Cell colors / fonts / borders | Whole-cell styling read/render/write (XLSX + ODS); still out: ODS style **read**, rich text (per-run), Web cell alignment |
-| Excel Table styling on Save | Rendered on screen, but the table overlay isn't re-emitted when saving (explicit cell styles are kept) |
+| Formula **evaluation** | Formula *text* is preserved (read + written, both formats) and shown on demand; we don't compute values, so a freshly authored formula has no cached result until Excel/LibreOffice opens it |
+| Cell colors / fonts / borders | Whole-cell styling reads, renders and writes in **both** formats (ODS styling now reads back too); still out: rich text (per-run), Web cell alignment |
+| Excel Table on Save | Re-emitted as a real table for `.xlsx`; writing the table overlay to `.ods` is still to come |
 | Images, charts, pivots | Ignored |
 | Conditional formatting | Ignored |
 | Encrypted (OLE-wrapped) workbooks | Surface as `NotAZip` |

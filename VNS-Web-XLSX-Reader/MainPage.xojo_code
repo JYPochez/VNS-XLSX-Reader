@@ -167,6 +167,39 @@ Begin WebPage MainPage
       Width           =   110
       _mPanelIndex    =   -1
    End
+   Begin WebButton ButtonAutoFit
+      Bold            =   "False"
+      Cancel          =   False
+      Caption         =   "#strings.kStrAutoFit"
+      ControlID       =   ""
+      CSSClasses      =   ""
+      Default         =   False
+      Enabled         =   True
+      FontName        =   ""
+      FontSize        =   "0.0"
+      Height          =   32
+      Index           =   -2147483648
+      Indicator       =   0
+      Italic          =   "False"
+      Left            =   806
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockHorizontal  =   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      LockVertical    =   False
+      PanelIndex      =   0
+      Scope           =   0
+      TabIndex        =   9
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   92
+      Underline       =   "False"
+      Visible         =   True
+      Width           =   88
+      _mPanelIndex    =   -1
+   End
    Begin WebLabel LabelParseTime
       Bold            =   "False"
       ControlID       =   ""
@@ -426,6 +459,72 @@ Begin WebPage MainPage
       Width           =   80
       _mPanelIndex    =   -1
    End
+   Begin WebCheckBox CheckboxZeroBased
+      Bold            =   "False"
+      State           =   0
+      Caption         =   "#strings.kStrZeroBased"
+      ControlID       =   ""
+      CSSClasses      =   ""
+      Enabled         =   True
+      FontName        =   ""
+      FontSize        =   "0.0"
+      Height          =   24
+      Index           =   -2147483648
+      Indicator       =   0
+      Italic          =   "False"
+      Left            =   16
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockHorizontal  =   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      LockVertical    =   False
+      PanelIndex      =   0
+      Scope           =   0
+      TabIndex        =   10
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   134
+      Underline       =   "False"
+      Visible         =   True
+      Value           =   False
+      Width           =   180
+      _mPanelIndex    =   -1
+   End
+   Begin WebButton ButtonTestIter
+      Bold            =   "False"
+      Cancel          =   False
+      Default         =   False
+      Caption         =   "#strings.kStrTestIter"
+      ControlID       =   ""
+      CSSClasses      =   ""
+      Enabled         =   True
+      FontName        =   ""
+      FontSize        =   "0.0"
+      Height          =   32
+      Index           =   -2147483648
+      Indicator       =   0
+      Italic          =   "False"
+      Left            =   206
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockHorizontal  =   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      LockVertical    =   False
+      PanelIndex      =   0
+      Scope           =   0
+      TabIndex        =   11
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   132
+      Underline       =   "False"
+      Visible         =   True
+      Width           =   110
+      _mPanelIndex    =   -1
+   End
    Begin WebTabPanel TabPanelSheets
       ControlCount    =   0
       ControlID       =   ""
@@ -454,7 +553,7 @@ Begin WebPage MainPage
       TabIndex        =   3
       TabStop         =   True
       Tooltip         =   ""
-      Top             =   132
+      Top            =   172
       Visible         =   True
       Width           =   868
       _mDesignHeight  =   0
@@ -480,7 +579,7 @@ Begin WebPage MainPage
       HasHeader       =   True
       Header          =   ""
       HeaderHeight    =   0
-      Height          =   460
+      Height            =   420
       HighlightSortedColumn=   True
       Index           =   -2147483648
       Indicator       =   0
@@ -510,7 +609,7 @@ Begin WebPage MainPage
       TabIndex        =   4
       TabStop         =   True
       Tooltip         =   ""
-      Top             =   172
+      Top            =   212
       Underline       =   "False"
       Visible         =   True
       Width           =   868
@@ -525,7 +624,7 @@ End
 		  If mWorkbook Is Nil Then Return
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Or idx >= mWorkbook.SheetCount Then Return
-		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
+		  Var sheet As XLSXSheet = mWorkbook.SheetAtRaw(idx + 1)
 		  XLSXWebListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles, mShowAllCells, CheckboxShowFormulas.Value)
 		End Sub
 	#tag EndMethod
@@ -535,7 +634,7 @@ End
 		  If mWorkbook Is Nil Then Return Nil
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Then Return Nil
-		  Return mWorkbook.SheetAt(idx + 1)
+		  Return mWorkbook.SheetAtRaw(idx + 1)
 		End Function
 	#tag EndMethod
 
@@ -676,6 +775,133 @@ End
 	#tag EndMethod
 
 	#tag Method, Flags = &h21
+		Private Sub AutoFitCurrentSheet()
+		  ' Size the visible sheet's columns to their content. The widths go into the
+		  ' model, so they show on screen AND are written to the saved file.
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Then Return
+		  sheet.AutoFitColumns
+		  FillCurrentSheet
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function IterCheck(ok As Boolean, ByRef failures As Integer) As String
+		  ' Tag one assertion and count the failures as we go.
+		  If ok Then Return "  [OK]"
+		  failures = failures + 1
+		  Return "  [FAIL]"
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub RunIterChecks(lines() As String, ByRef failures As Integer, sheetNames() As String, ByRef firstCell As XLSXCell)
+		  ' One pass of the suite in whichever index base is currently active.
+		  Var base As Integer = If(XLSXHelpers.gZeroBasedSheetsRowsColumns, 0, 1)
+		  lines.Add "--- base " + Str(base) + " (" + If(base = 0, "0-based", "1-based") + ") ---"
+
+		  For Each sh As XLSXSheet In mWorkbook
+		    sheetNames.Add sh.Name
+		  Next
+		  lines.Add "  For Each workbook: " + Str(sheetNames.Count) + " of " + Str(mWorkbook.SheetCount) _
+		    + IterCheck(sheetNames.Count = mWorkbook.SheetCount, failures)
+
+		  Var sameOrder As Boolean = True
+		  For i As Integer = 0 To sheetNames.LastIndex
+		    Var sh As XLSXSheet = mWorkbook.SheetAt(base + i)
+		    If sh Is Nil Or sh.Name <> sheetNames(i) Then sameOrder = False
+		  Next
+		  lines.Add "  Order matches SheetAt" + IterCheck(sameOrder, failures)
+
+		  Var arr() As XLSXSheet = mWorkbook.Sheets
+		  lines.Add "  Sheets() array: " + Str(arr.Count) + IterCheck(arr.Count = mWorkbook.SheetCount, failures)
+
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Then Return
+		  lines.Add "  Sheet: " + sheet.Name + " (" + Str(sheet.RowCount) + " x " + Str(sheet.ColCount) + ")"
+
+		  Var rc() As XLSXCell = sheet.RowCells(base)
+		  lines.Add "  RowCells: " + Str(rc.Count) + IterCheck(rc.Count = sheet.ColCount, failures)
+
+		  Var cc() As XLSXCell = sheet.ColumnCells(base)
+		  lines.Add "  ColumnCells: " + Str(cc.Count) + IterCheck(cc.Count = sheet.RowCount, failures)
+
+		  Var identical As Boolean = True
+		  For j As Integer = 0 To rc.LastIndex
+		    If Not (rc(j) Is sheet.CellAt(base, base + j)) Then identical = False
+		  Next
+		  lines.Add "  RowCells match CellAt" + IterCheck(identical, failures)
+
+		  Var seen As Integer = 0
+		  Var nonEmpty As Integer = 0
+		  For r As Integer = base To base + sheet.RowCount - 1
+		    For Each c As XLSXCell In sheet.RowCells(r)
+		      seen = seen + 1
+		      If Not c.IsEmpty Then nonEmpty = nonEmpty + 1
+		    Next
+		  Next
+		  lines.Add "  Cells walked: " + Str(seen) + IterCheck(seen = sheet.RowCount * sheet.ColCount, failures)
+		  lines.Add "  Non-empty: " + Str(nonEmpty)
+
+		  firstCell = sheet.CellAt(base, base)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub TestIterators()
+		  ' Same self-test as the Desktop app: run the suite in BOTH index bases and
+		  ' prove they expose the same objects. The flag is restored in Finally.
+		  ' The report opens in a new tab — a WebMessageDialog would collapse the
+		  ' line breaks.
+		  If mWorkbook Is Nil Then Return
+		  Var saved As Boolean = XLSXHelpers.gZeroBasedSheetsRowsColumns
+		  Var failures As Integer = 0
+		  Var lines() As String
+		  Var namesOne() As String
+		  Var namesZero() As String
+		  Var cellOne As XLSXCell
+		  Var cellZero As XLSXCell
+
+		  Try
+		    XLSXHelpers.gZeroBasedSheetsRowsColumns = False
+		    RunIterChecks(lines, failures, namesOne, cellOne)
+		    lines.Add ""
+		    XLSXHelpers.gZeroBasedSheetsRowsColumns = True
+		    RunIterChecks(lines, failures, namesZero, cellZero)
+		  Finally
+		    XLSXHelpers.gZeroBasedSheetsRowsColumns = saved
+		  End Try
+
+		  lines.Add ""
+		  lines.Add "--- 1-based vs 0-based ---"
+		  Var sameNames As Boolean = namesOne.Count = namesZero.Count
+		  If sameNames Then
+		    For i As Integer = 0 To namesOne.LastIndex
+		      If namesOne(i) <> namesZero(i) Then sameNames = False
+		    Next
+		  End If
+		  lines.Add "  Same sheets, same order" + IterCheck(sameNames, failures)
+		  lines.Add "  Same top-left cell object" + IterCheck(cellOne Is cellZero, failures)
+		  lines.Add "  Flag restored to " + If(saved, "0-based", "1-based") _
+		    + IterCheck(XLSXHelpers.gZeroBasedSheetsRowsColumns = saved, failures)
+
+		  lines.Add ""
+		  If failures = 0 Then
+		    lines.Add "RESULT: all checks passed in both index bases"
+		  Else
+		    lines.Add "RESULT: " + Str(failures) + " check(s) FAILED"
+		  End If
+
+		  mReportFile = New WebFile
+		  mReportFile.MimeType = "text/html; charset=utf-8"
+		  mReportFile.FileName = "IteratorSelfTest.html"
+		  mReportFile.ForceDownload = False
+		  mReportFile.Data = CodePageHtml(String.FromArray(lines, EndOfLine), strings.kStrTestIterTitle)
+		  Self.GoToURL(mReportFile.URL, True)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
 		Private Sub GenerateCode()
 		  ' Generate ready-to-paste Xojo builder source for the current workbook and
 		  ' open it in a new browser tab inside a <textarea> for easy copy/paste.
@@ -685,19 +911,19 @@ End
 		  mCodeFile.MimeType = "text/html; charset=utf-8"
 		  mCodeFile.FileName = "BuildWorkbook.html"
 		  mCodeFile.ForceDownload = False
-		  mCodeFile.Data = CodePageHtml(src)
+		  mCodeFile.Data = CodePageHtml(src, strings.kStrGenCode)
 		  Self.GoToURL(mCodeFile.URL, True)   ' True = new tab/window
 		End Sub
 	#tag EndMethod
 
 	#tag Method, Flags = &h21
-		Private Function CodePageHtml(code As String) As String
+		Private Function CodePageHtml(code As String, pageTitle As String) As String
 		  ' Wrap the generated code in a minimal HTML page with a full-window
 		  ' <textarea>. Only &, < and > need escaping inside a textarea.
 		  Var esc As String = code.ReplaceAll("&", "&amp;")
 		  esc = esc.ReplaceAll("<", "&lt;").ReplaceAll(">", "&gt;")
 		  Var h() As String
-		  h.Add "<!DOCTYPE html><html><head><meta charset=""utf-8""><title>Xojo builder code</title></head>"
+		  h.Add "<!DOCTYPE html><html><head><meta charset=""utf-8""><title>" + pageTitle + "</title></head>"
 		  h.Add "<body style=""margin:0"">"
 		  h.Add "<textarea readonly spellcheck=""false"" style=""width:100%;height:100vh;box-sizing:border-box;border:0;padding:12px;font-family:monospace;font-size:13px;white-space:pre"">"
 		  h.Add esc
@@ -712,14 +938,14 @@ End
 		  If mWorkbook Is Nil Then Return
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Then Return
-		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
+		  Var sheet As XLSXSheet = mWorkbook.SheetAtRaw(idx + 1)
 		  If sheet Is Nil Then Return
 
 		  Var sheetRow As Integer = ListboxData.CellTagAt(lbRow, 0).IntegerValue
 		  Var sheetCol As Integer = lbCol + 1
 		  If sheetRow <= 0 Or sheetCol <= 0 Then Return
 
-		  Var oldCell As XLSXCell = sheet.CellAt(sheetRow, sheetCol)
+		  Var oldCell As XLSXCell = sheet.CellAtRaw(sheetRow, sheetCol)
 		  Var newCell As XLSXCell
 
 		  If newText.Trim = "" Then
@@ -735,7 +961,7 @@ End
 		    newCell = New XLSXCell(XLSXEnums.eCellType.Str, newText, -1)
 		  End If
 
-		  sheet.PutCell(sheetRow, sheetCol, newCell)
+		  sheet.PutCellRaw(sheetRow, sheetCol, newCell)
 		  ' Re-render through the formatter so the cell shows its formatted value.
 		  ListboxData.CellTextAt(lbRow, lbCol) = newCell.DisplayText(mWorkbook.Styles)
 		End Sub
@@ -773,6 +999,10 @@ End
 
 	#tag Property, Flags = &h21
 		Private mCodeFile As WebFile
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private mReportFile As WebFile
 	#tag EndProperty
 
 	#tag Property, Flags = &h21
@@ -816,6 +1046,30 @@ End
 	#tag Event
 		Sub Pressed()
 		  DoNewWorkbook
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events ButtonAutoFit
+	#tag Event
+		Sub Pressed()
+		  AutoFitCurrentSheet
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events CheckboxZeroBased
+	#tag Event
+		Sub ValueChanged()
+		  ' Test switch for the public index base; the page itself runs on the *Raw
+		  ' API, so nothing on screen should change.
+		  XLSXHelpers.gZeroBasedSheetsRowsColumns = Me.Value
+		  FillCurrentSheet
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events ButtonTestIter
+	#tag Event
+		Sub Pressed()
+		  TestIterators
 		End Sub
 	#tag EndEvent
 #tag EndEvents

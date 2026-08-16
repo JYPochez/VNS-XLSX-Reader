@@ -19,7 +19,7 @@ Protected Module XLSXDesktopListboxFiller
 
 		  If Not promoteHeader Then
 		    For c As Integer = 1 To cols
-		      Var h As String = XLSXCellRef.IndexToColLetters(c)
+		      Var h As String = XLSXCellRef.IndexToColLettersRaw(c)
 		      lb.HeaderAt(c - 1) = h
 		      colMaxLen.Add Max(h.Length, 4)
 		    Next
@@ -28,7 +28,7 @@ Protected Module XLSXDesktopListboxFiller
 		    Var headerRow As Integer = FindFirstNonEmptyRow(sheet)
 		    If headerRow = 0 Then Return
 		    For c As Integer = 1 To cols
-		      Var hc As XLSXCell = sheet.CellAt(headerRow, c)
+		      Var hc As XLSXCell = sheet.CellAtRaw(headerRow, c)
 		      Var h As String = If(showFormulas And hc.HasFormula, hc.FormulaText, hc.DisplayText(styles))
 		      lb.HeaderAt(c - 1) = h
 		      colMaxLen.Add h.Length
@@ -45,10 +45,10 @@ Protected Module XLSXDesktopListboxFiller
 		    Var rowTexts() As String
 		    For c As Integer = 1 To cols
 		      Var text As String
-		      If sheet.IsCellMergedFollower(r, c) Then
+		      If sheet.IsCellMergedFollowerRaw(r, c) Then
 		        text = ""
 		      Else
-		        Var dc As XLSXCell = sheet.CellAt(r, c)
+		        Var dc As XLSXCell = sheet.CellAtRaw(r, c)
 		        text = If(showFormulas And dc.HasFormula, dc.FormulaText, dc.DisplayText(styles))
 		      End If
 		      rowTexts.Add text
@@ -64,9 +64,9 @@ Protected Module XLSXDesktopListboxFiller
 		      If n > colMaxLen(c) Then colMaxLen(c) = n
 		      ' Stash a non-default visual style in the cell tag for the paint events
 		      ' to render (merge followers stay blank/unstyled).
-		      If Not sheet.IsCellMergedFollower(r, c + 1) Then
-		        Var dataCell As XLSXCell = sheet.CellAt(r, c + 1)
-		        Var st As XLSXCellStyle = sheet.EffectiveStyle(r, c + 1)
+		      If Not sheet.IsCellMergedFollowerRaw(r, c + 1) Then
+		        Var dataCell As XLSXCell = sheet.CellAtRaw(r, c + 1)
+		        Var st As XLSXCellStyle = sheet.EffectiveStyleRaw(r, c + 1)
 		        ' Excel right-aligns numbers/dates under General alignment; mirror that
 		        ' (clone so the shared style isn't mutated).
 		        Var numeric As Boolean = dataCell.eType = XLSXEnums.eCellType.Number _
@@ -96,17 +96,29 @@ Protected Module XLSXDesktopListboxFiller
 		  Const kMaxPx As Integer = 400
 		  Const kCharPx As Integer = 7    ' approximate average glyph width at the default font
 		  Const kPaddingPx As Integer = 16
-		  Var parts() As String
+		  Var widths() As Double
 		  For j As Integer = 0 To colMaxLen.LastIndex
-		    Var wpt As Double = sheet.ColumnWidth(j + 1)   ' listbox col j -> sheet col j+1
+		    Var wpt As Double = sheet.ColumnWidthRaw(j + 1)   ' listbox col j -> sheet col j+1
 		    If wpt > 0 Then
-		      parts.Add Str(Round(wpt))
+		      widths.Add XLSXHelpers.PointsToPixels(wpt)
 		    Else
 		      Var w As Integer = (colMaxLen(j) * kCharPx) + kPaddingPx
 		      If w < kMinPx Then w = kMinPx
 		      If w > kMaxPx Then w = kMaxPx
-		      parts.Add Str(w)
+		      widths.Add w
 		    End If
+		  Next
+		  ' The listbox can't scroll beyond the sum of its column widths, so the last
+		  ' column's right edge ends up flush against the frame (partly under the
+		  ' vertical scrollbar) with nothing left to scroll to. Give it slack.
+		  ' MainWindow.CaptureColumnWidths subtracts the same amount, so this pad
+		  ' never accumulates into the model or the saved file.
+		  If widths.LastIndex >= 0 Then
+		    widths(widths.LastIndex) = widths(widths.LastIndex) + LastColumnPadPixels
+		  End If
+		  Var parts() As String
+		  For Each w As Double In widths
+		    parts.Add Str(Round(w))
 		  Next
 		  lb.ColumnWidths = String.FromArray(parts, ",")
 		End Sub
@@ -135,7 +147,7 @@ Protected Module XLSXDesktopListboxFiller
 		  Var hr As Integer = FindFirstNonEmptyRow(sheet)
 		  If hr <= 0 Then Return False
 		  For c As Integer = 1 To sheet.ColCount
-		    If Not sheet.EffectiveStyle(hr, c).IsDefault Then Return True
+		    If Not sheet.EffectiveStyleRaw(hr, c).IsDefault Then Return True
 		  Next
 		  Return False
 		End Function
@@ -146,7 +158,7 @@ Protected Module XLSXDesktopListboxFiller
 		  Var maxProbe As Integer = Min(sheet.RowCount, 50)
 		  For r As Integer = 1 To maxProbe
 		    For c As Integer = 1 To sheet.ColCount
-		      If Not sheet.CellAt(r, c).IsEmpty Then Return r
+		      If Not sheet.CellAtRaw(r, c).IsEmpty Then Return r
 		    Next
 		  Next
 		  Return 1
@@ -160,10 +172,19 @@ Protected Module XLSXDesktopListboxFiller
 		  ' firstDataRow - 1 when there is no body content at all.
 		  For r As Integer = sheet.RowCount DownTo firstDataRow
 		    For c As Integer = 1 To cols
-		      If Not sheet.CellAt(r, c).IsEmpty Then Return r
+		      If Not sheet.CellAtRaw(r, c).IsEmpty Then Return r
 		    Next
 		  Next
 		  Return firstDataRow - 1
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function LastColumnPadPixels() As Integer
+		  ' Slack added to the LAST column's listbox width so the grid can scroll
+		  ' far enough to reveal it. Exposed so MainWindow.CaptureColumnWidths can
+		  ' subtract it again and keep the model (and saved file) drift-free.
+		  Return 24
 		End Function
 	#tag EndMethod
 

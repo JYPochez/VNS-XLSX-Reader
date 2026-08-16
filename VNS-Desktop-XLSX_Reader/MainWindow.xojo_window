@@ -162,7 +162,7 @@ Begin DesktopWindow MainWindow
       Height          =   24
       Index           =   -2147483648
       Italic          =   False
-      Left            =   460
+      Left            =   452
       LockBottom      =   False
       LockedInPosition=   False
       LockLeft        =   True
@@ -178,7 +178,69 @@ Begin DesktopWindow MainWindow
       Transparent     =   False
       Underline       =   False
       Visible         =   True
-      Width           =   110
+      Width            =   104
+   End
+   Begin DesktopButton ButtonAutoFit
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrAutoFit"
+      Default         =   False
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   560
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   4
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   8
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width            =   92
+   End
+   Begin DesktopButton ButtonTestIter
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Cancel          =   False
+      Caption         =   "#strings.kStrTestIter"
+      Default         =   False
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   24
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   656
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      MacButtonStyle  =   0
+      Scope           =   0
+      TabIndex        =   6
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   8
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   90
    End
    Begin DesktopLabel LabelParseTime
       AllowAutoDeactivate=   True
@@ -209,7 +271,38 @@ Begin DesktopWindow MainWindow
       Transparent     =   False
       Underline       =   False
       Visible         =   True
-      Width           =   290
+      Width           =   250
+   End
+   Begin DesktopCheckBox CheckboxZeroBased
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Caption         =   "#strings.kStrZeroBased"
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   20
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   460
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   False
+      LockRight       =   True
+      LockTop         =   True
+      Scope           =   0
+      State           =   0
+      TabIndex        =   5
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Tooltip         =   ""
+      Top             =   44
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Value           =   False
+      VisualState     =   0
+      Width           =   118
    End
    Begin DesktopButton ButtonAddRow
       AllowAutoDeactivate=   True
@@ -475,10 +568,137 @@ End
 		  If mWorkbook Is Nil Then Return
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Or idx >= mWorkbook.SheetCount Then Return
-		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
+		  Var sheet As XLSXSheet = mWorkbook.SheetAtRaw(idx + 1)
 		  XLSXDesktopListboxFiller.Fill(ListboxData, sheet, mWorkbook.Styles, mShowAllCells, CheckboxShowFormulas.Value)
 		  mShownSheetIndex = idx   ' remember which sheet the listbox currently shows
 		  BuildHeaderStyles(sheet)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub AutoFitCurrentSheet()
+		  ' Size the visible sheet's columns to their content. The widths go into the
+		  ' model, so they show on screen AND are written to the saved file.
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Then Return
+		  sheet.AutoFitColumns
+		  FillCurrentSheet
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function IterCheck(ok As Boolean, ByRef failures As Integer) As String
+		  ' Tag one assertion and count the failures as we go.
+		  If ok Then Return "  [OK]"
+		  failures = failures + 1
+		  Return "  [FAIL]"
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub RunIterChecks(lines() As String, ByRef failures As Integer, sheetNames() As String, ByRef firstCell As XLSXCell)
+		  ' One pass of the suite in whichever index base is currently active.
+		  Var base As Integer = If(XLSXHelpers.gZeroBasedSheetsRowsColumns, 0, 1)
+		  lines.Add "--- base " + Str(base) + " (" + If(base = 0, "0-based", "1-based") + ") ---"
+
+		  For Each sh As XLSXSheet In mWorkbook
+		    sheetNames.Add sh.Name
+		  Next
+		  lines.Add "  For Each workbook: " + Str(sheetNames.Count) + " of " + Str(mWorkbook.SheetCount) _
+		    + IterCheck(sheetNames.Count = mWorkbook.SheetCount, failures)
+
+		  Var sameOrder As Boolean = True
+		  For i As Integer = 0 To sheetNames.LastIndex
+		    Var sh As XLSXSheet = mWorkbook.SheetAt(base + i)
+		    If sh Is Nil Or sh.Name <> sheetNames(i) Then sameOrder = False
+		  Next
+		  lines.Add "  Order matches SheetAt" + IterCheck(sameOrder, failures)
+
+		  Var arr() As XLSXSheet = mWorkbook.Sheets
+		  lines.Add "  Sheets() array: " + Str(arr.Count) + IterCheck(arr.Count = mWorkbook.SheetCount, failures)
+
+		  Var sheet As XLSXSheet = CurrentSheet
+		  If sheet Is Nil Then Return
+		  lines.Add "  Sheet: " + sheet.Name + " (" + Str(sheet.RowCount) + " x " + Str(sheet.ColCount) + ")"
+
+		  Var rc() As XLSXCell = sheet.RowCells(base)
+		  lines.Add "  RowCells: " + Str(rc.Count) + IterCheck(rc.Count = sheet.ColCount, failures)
+
+		  Var cc() As XLSXCell = sheet.ColumnCells(base)
+		  lines.Add "  ColumnCells: " + Str(cc.Count) + IterCheck(cc.Count = sheet.RowCount, failures)
+
+		  ' Each cell must be the very object CellAt hands back, not a copy.
+		  Var identical As Boolean = True
+		  For j As Integer = 0 To rc.LastIndex
+		    If Not (rc(j) Is sheet.CellAt(base, base + j)) Then identical = False
+		  Next
+		  lines.Add "  RowCells match CellAt" + IterCheck(identical, failures)
+
+		  Var seen As Integer = 0
+		  Var nonEmpty As Integer = 0
+		  For r As Integer = base To base + sheet.RowCount - 1
+		    For Each c As XLSXCell In sheet.RowCells(r)
+		      seen = seen + 1
+		      If Not c.IsEmpty Then nonEmpty = nonEmpty + 1
+		    Next
+		  Next
+		  lines.Add "  Cells walked: " + Str(seen) + IterCheck(seen = sheet.RowCount * sheet.ColCount, failures)
+		  lines.Add "  Non-empty: " + Str(nonEmpty)
+
+		  firstCell = sheet.CellAt(base, base)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub TestIterators()
+		  ' Run the whole suite in BOTH index bases from a single press, then prove the
+		  ' two agree: the flag must change how you ADDRESS a cell, never WHICH cell
+		  ' you get back. The flag is restored in Finally, even on an exception.
+		  If mWorkbook Is Nil Then Return
+		  Var saved As Boolean = XLSXHelpers.gZeroBasedSheetsRowsColumns
+		  Var failures As Integer = 0
+		  Var lines() As String
+		  Var namesOne() As String
+		  Var namesZero() As String
+		  Var cellOne As XLSXCell
+		  Var cellZero As XLSXCell
+
+		  Try
+		    XLSXHelpers.gZeroBasedSheetsRowsColumns = False
+		    RunIterChecks(lines, failures, namesOne, cellOne)
+		    lines.Add ""
+		    XLSXHelpers.gZeroBasedSheetsRowsColumns = True
+		    RunIterChecks(lines, failures, namesZero, cellZero)
+		  Finally
+		    XLSXHelpers.gZeroBasedSheetsRowsColumns = saved
+		  End Try
+
+		  ' The two bases must expose exactly the same data.
+		  lines.Add ""
+		  lines.Add "--- 1-based vs 0-based ---"
+		  Var sameNames As Boolean = namesOne.Count = namesZero.Count
+		  If sameNames Then
+		    For i As Integer = 0 To namesOne.LastIndex
+		      If namesOne(i) <> namesZero(i) Then sameNames = False
+		    Next
+		  End If
+		  lines.Add "  Same sheets, same order" + IterCheck(sameNames, failures)
+		  lines.Add "  Same top-left cell object" + IterCheck(cellOne Is cellZero, failures)
+		  lines.Add "  Flag restored to " + If(saved, "0-based", "1-based") _
+		    + IterCheck(XLSXHelpers.gZeroBasedSheetsRowsColumns = saved, failures)
+
+		  lines.Add ""
+		  If failures = 0 Then
+		    lines.Add "RESULT: all checks passed in both index bases"
+		  Else
+		    lines.Add "RESULT: " + Str(failures) + " check(s) FAILED"
+		  End If
+
+		  Var d As New MessageDialog
+		  d.Title = strings.kStrTestIterTitle
+		  d.Message = strings.kStrTestIterTitle
+		  d.Explanation = String.FromArray(lines, EndOfLine)
+		  Call d.ShowModal
 		End Sub
 	#tag EndMethod
 
@@ -515,7 +735,7 @@ End
 		  Var hr As Integer = XLSXDesktopListboxFiller.HeaderRowIndex(sheet)
 		  If hr <= 0 Then Return
 		  For c As Integer = 1 To sheet.ColCount
-		    Var st As XLSXCellStyle = sheet.EffectiveStyle(hr, c)
+		    Var st As XLSXCellStyle = sheet.EffectiveStyleRaw(hr, c)
 		    If st <> Nil And Not st.IsDefault Then mHeaderStyles.Value(c - 1) = st
 		  Next
 		End Sub
@@ -524,14 +744,19 @@ End
 	#tag Method, Flags = &h21
 		Private Sub CaptureColumnWidths(sheetIndex As Integer)
 		  ' Read the listbox's current (possibly user-resized) column widths back
-		  ' into the model so Save reflects what's on screen. WidthActual is in the
-		  ' same unit the model uses (points). Maps listbox col j -> sheet col j+1.
+		  ' into the model so Save reflects what's on screen. WidthActual is in
+		  ' PIXELS; the model stores points, so convert. Maps listbox col j -> sheet
+		  ' col j+1.
 		  If mWorkbook Is Nil Or sheetIndex < 0 Or sheetIndex >= mWorkbook.SheetCount Then Return
-		  Var sheet As XLSXSheet = mWorkbook.SheetAt(sheetIndex + 1)
+		  Var sheet As XLSXSheet = mWorkbook.SheetAtRaw(sheetIndex + 1)
 		  If sheet Is Nil Then Return
 		  For j As Integer = 0 To ListboxData.ColumnCount - 1
 		    Var wActual As Integer = ListboxData.ColumnAttributesAt(j).WidthActual
-		    If wActual > 0 Then sheet.SetColumnWidth(j + 1, wActual)
+		    ' Undo the trailing slack the filler adds to the last column.
+		    If j = ListboxData.ColumnCount - 1 Then
+		      wActual = wActual - XLSXDesktopListboxFiller.LastColumnPadPixels
+		    End If
+		    If wActual > 0 Then sheet.SetColumnWidthRaw(j + 1, XLSXHelpers.PixelsToPoints(wActual))
 		  Next
 		End Sub
 	#tag EndMethod
@@ -541,7 +766,7 @@ End
 		  If mWorkbook Is Nil Then Return Nil
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Then Return Nil
-		  Return mWorkbook.SheetAt(idx + 1)
+		  Return mWorkbook.SheetAtRaw(idx + 1)
 		End Function
 	#tag EndMethod
 
@@ -700,7 +925,7 @@ End
 		  If mWorkbook Is Nil Then Return
 		  Var idx As Integer = TabPanelSheets.SelectedPanelIndex
 		  If idx < 0 Then Return
-		  Var sheet As XLSXSheet = mWorkbook.SheetAt(idx + 1)
+		  Var sheet As XLSXSheet = mWorkbook.SheetAtRaw(idx + 1)
 		  If sheet Is Nil Then Return
 
 		  Var sheetRow As Integer = ListboxData.RowTagAt(lbRow).IntegerValue
@@ -708,7 +933,7 @@ End
 		  If sheetRow <= 0 Or sheetCol <= 0 Then Return
 
 		  Var newText As String = ListboxData.CellTextAt(lbRow, lbCol)
-		  Var oldCell As XLSXCell = sheet.CellAt(sheetRow, sheetCol)
+		  Var oldCell As XLSXCell = sheet.CellAtRaw(sheetRow, sheetCol)
 		  Var newCell As XLSXCell
 
 		  If newText.Trim = "" Then
@@ -724,7 +949,7 @@ End
 		    newCell = New XLSXCell(XLSXEnums.eCellType.Str, newText, -1)
 		  End If
 
-		  sheet.PutCell(sheetRow, sheetCol, newCell)
+		  sheet.PutCellRaw(sheetRow, sheetCol, newCell)
 		  ' Re-render through the formatter so the cell shows its formatted value.
 		  ListboxData.CellTextAt(lbRow, lbCol) = newCell.DisplayText(mWorkbook.Styles)
 		End Sub
@@ -834,6 +1059,36 @@ End
 		Sub ValueChanged()
 		  ' Toggle between cached values and formula text; re-fill the current sheet.
 		  FillCurrentSheet
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events CheckboxZeroBased
+	#tag Event
+		Sub ValueChanged()
+		  ' Test switch for the public index base. The app itself works in raw
+		  ' 1-based coordinates, so flipping this should change NOTHING on screen —
+		  ' any visible shift means a call site still goes through the translating
+		  ' API. What does change is code that uses the public API: the Gen code
+		  ' output switches between 1-based and 0-based indices.
+		  XLSXHelpers.gZeroBasedSheetsRowsColumns = Me.Value
+		  FillCurrentSheet
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonTestIter
+	#tag Event
+		Sub Pressed()
+		  TestIterators
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+
+#tag Events ButtonAutoFit
+	#tag Event
+		Sub Pressed()
+		  AutoFitCurrentSheet
 		End Sub
 	#tag EndEvent
 #tag EndEvents

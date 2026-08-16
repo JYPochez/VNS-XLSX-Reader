@@ -27,11 +27,26 @@ Protected Module strings
 	#tag Constant, Name = kStrInMemory, Type = String, Dynamic = True, Default = \"Read in memory", Scope = Public, Description = 43617074696F6E20666F722074686520225265616420696E206D656D6F72792220636865636B626F7820636F6E74726F6C6C696E6720584C53585A69702773206F70656E206261636B656E642E0A
 	#tag EndConstant
 
-	#tag Constant, Name = kStrShowFormulas, Type = String, Dynamic = True, Default = \"Show formulas", Scope = Public
+	#tag Constant, Name = kStrShowFormulas, Type = String, Dynamic = True, Default = \"Show formulas", Scope = Public, Description = 43617074696F6E20666F72207468652053686F7720666F726D756C617320636865636B626F78207468617420746F67676C657320666F726D756C61207465787420616761696E737420746865206361636865642076616C75652E0A
 	#tag EndConstant
 
-	#tag Constant, Name = kStrGenCode, Type = String, Dynamic = True, Default = \"Gen code…", Scope = Public
+	#tag Constant, Name = kStrGenCode, Type = String, Dynamic = True, Default = \"Gen code…", Scope = Public, Description = 43617074696F6E20666F72207468652047656E20636F646520627574746F6E20746861742067656E65726174657320586F6A6F206275696C64657220736F757263652066726F6D20746865206F70656E20776F726B626F6F6B2E0A
 	#tag EndConstant
+
+	#tag Constant, Name = kStrAutoFit, Type = String, Dynamic = True, Default = \"Auto-fit", Scope = Public, Description = 43617074696F6E206F6620746865204175746F2D66697420627574746F6E20746861742073697A6573207468652063757272656E74207368656574277320636F6C756D6E7320746F20746865697220636F6E74656E742E0A
+	#tag EndConstant
+
+	#tag Constant, Name = kStrZeroBased, Type = String, Dynamic = True, Default = \"0-based indexes", Scope = Public, Description = 43617074696F6E206F6620746865207465737420636865636B626F78207468617420746F67676C65732074686520302D626173656420696E64657820666C61672E0A
+	#tag EndConstant
+
+	#tag Constant, Name = kStrTestIter, Type = String, Dynamic = True, Default = \"Test iter", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = kStrTestIterTitle, Type = String, Dynamic = True, Default = \"Iterator self-test", Scope = Public
+	#tag EndConstant
+
+
+
 
 	#tag Constant, Name = kStrParseTime, Type = String, Dynamic = True, Default = \"Parsed in ", Scope = Public, Description = 5072656669782073686F776E206E65787420746F2074686520696E2D6D656D6F727920636865636B626F78206265666F7265207468652070617273652D656C6170736564206D696C6C697365636F6E64732E0A
 	#tag EndConstant

@@ -1,5 +1,6 @@
 #tag Class
 Protected Class XLSXWorkbook
+Implements Iterable
 	#tag Method, Flags = &h0, Description = 4275696C6420616E20656D70747920776F726B626F6F6B2077697468206120736F75726365206E616D65202866696C656E616D65206F7220223C6D656D6F72793E22292E205368656574732061726520616464656420627920584C535852656164657220647572696E672070617273652E0A
 		Sub Constructor(sourceName As String)
 		  Me.SourceName = sourceName
@@ -13,7 +14,7 @@ Protected Class XLSXWorkbook
 		End Sub
 	#tag EndMethod
 
-	#tag Method, Flags = &h0
+	#tag Method, Flags = &h0, Description = 43726561746520616E20656D707479207368656574206E616D6564206E616D652C20617070656E6420697420617420746865206E65787420696E6465782C20616E642072657475726E2069742E0A
 		Function AddSheet(name As String) As XLSXSheet
 		  ' Fluent authoring: create an empty sheet, append it at the next index,
 		  ' and return it so the caller can start placing cells right away.
@@ -29,8 +30,8 @@ Protected Class XLSXWorkbook
 		End Function
 	#tag EndMethod
 
-	#tag Method, Flags = &h0, Description = 52657475726E732074686520692D74682073686565742028312D6261736564292E2052657475726E73204E696C20666F72206F75742D6F662D72616E676520696E64696365732E0A
-		Function SheetAt(index As Integer) As XLSXSheet
+	#tag Method, Flags = &h0, Description = 5368656574206174206120312D626173656420696E6465782C20627970617373696E6720696E646578207472616E736C6174696F6E2E204E696C207768656E206F7574206F662072616E67652E0A
+		Function SheetAtRaw(index As Integer) As XLSXSheet
 		  ' 1-based for callers; internal storage 0-based.
 		  If index < 1 Or index > mSheets.KeyCount Then Return Nil
 		  Return mSheets.Value(index - 1)
@@ -62,7 +63,7 @@ Protected Class XLSXWorkbook
 		SourceName As String
 	#tag EndProperty
 
-	#tag Property, Flags = &h0
+	#tag Property, Flags = &h0, Description = 54686520776F726B626F6F6B2773207265736F6C766564207368617265642D737472696E672061727261792E0A
 		SharedStrings() As String
 	#tag EndProperty
 
@@ -85,6 +86,34 @@ Protected Class XLSXWorkbook
 	#tag Property, Flags = &h21, Description = 496E7465726E616C2044696374696F6E617279206B6579656420627920302D626173656420696E646578202D3E20584C535853686565742E0A
 		Private mSheets As Dictionary
 	#tag EndProperty
+
+	#tag Method, Flags = &h0, Description = 52657475726E732074686520692D74682073686565742028312D6261736564292E2052657475726E73204E696C20666F72206F75742D6F662D72616E676520696E64696365732E0A
+		Function SheetAt(index As Integer) As XLSXSheet
+		  ' Sheet index in the caller's base — 1-based unless
+		  ' gZeroBasedSheetsRowsColumns is set. Nil when out of range.
+		  Return SheetAtRaw(XLSXHelpers.ToInternalIndex(index))
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 4974657261626C6520696E746572666163653A2072657475726E7320616E206974657261746F72206F7665722074686520776F726B626F6F6B2773207368656574732C20656E61626C696E6720466F72204561636820736865657420417320584C5358536865657420496E20776F726B626F6F6B2E0A
+		Function Iterator() As Iterator
+		  ' Iterable: lets a workbook be walked directly —
+		  '   For Each sheet As XLSXSheet In workbook
+		  Return New XLSXSheetIterator(Self)
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0, Description = 416C6C2073686565747320696E20776F726B626F6F6B206F72646572206173206120706C61696E2061727261792C20666F72207768656E20796F75206E65656420746F20696E646578206F7220736F727420726174686572207468616E20697465726174652E0A
+		Function Sheets() As XLSXSheet()
+		  ' All sheets in workbook order, as a plain array — handy when you need to
+		  ' index or sort them rather than just iterate.
+		  Var arr() As XLSXSheet
+		  For i As Integer = 1 To mSheets.KeyCount
+		    arr.Add SheetAtRaw(i)
+		  Next
+		  Return arr
+		End Function
+	#tag EndMethod
 
 	#tag Note, Name = About
 		Top-level container for a parsed XLSX workbook.

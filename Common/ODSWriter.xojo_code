@@ -50,10 +50,10 @@ Protected Module ODSWriter
 		  Var ceCounter As Integer = 0
 		  Var dataCounter As Integer = 0
 		  For s As Integer = 1 To wb.SheetCount
-		    Var sheet As XLSXSheet = wb.SheetAt(s)
+		    Var sheet As XLSXSheet = wb.SheetAtRaw(s)
 		    For r As Integer = 1 To sheet.RowCount
 		      For c As Integer = 1 To sheet.ColCount
-		        Var cell As XLSXCell = sheet.CellAt(r, c)
+		        Var cell As XLSXCell = sheet.CellAtRaw(r, c)
 		        If cell.IsEmpty Then Continue
 		        Var code As String = XLSXHelpers.WriteFormatCode(cell, wb.Styles)
 		        Var cst As XLSXCellStyle = cell.ResolvedStyle(wb.Styles)
@@ -91,9 +91,9 @@ Protected Module ODSWriter
 		  Var colCounter As Integer = 0
 		  Var rowCounter As Integer = 0
 		  For s As Integer = 1 To wb.SheetCount
-		    Var sheet As XLSXSheet = wb.SheetAt(s)
+		    Var sheet As XLSXSheet = wb.SheetAtRaw(s)
 		    For c As Integer = 1 To Max(1, sheet.ColCount)   ' match TableXml's column count
-		      Var wpt As Double = sheet.ColumnWidth(c)
+		      Var wpt As Double = sheet.ColumnWidthRaw(c)
 		      If wpt <= 0 Then wpt = 48.0
 		      Var key As String = Str(wpt)
 		      If Not colStyles.HasKey(key) Then
@@ -103,7 +103,7 @@ Protected Module ODSWriter
 		      End If
 		    Next
 		    For r As Integer = 1 To sheet.RowCount
-		      Var hpt As Double = sheet.RowHeight(r)
+		      Var hpt As Double = sheet.RowHeightRaw(r)
 		      If hpt <= 0 Then Continue
 		      Var key As String = Str(hpt)
 		      If Not rowStyles.HasKey(key) Then
@@ -131,7 +131,7 @@ Protected Module ODSWriter
 		  parts.Add "</office:automatic-styles>"
 		  parts.Add "<office:body><office:spreadsheet>"
 		  For s As Integer = 1 To wb.SheetCount
-		    parts.Add TableXml(wb.SheetAt(s), wb.Styles, sigToCe, colStyles, rowStyles)
+		    parts.Add TableXml(wb.SheetAtRaw(s), wb.Styles, sigToCe, colStyles, rowStyles)
 		  Next
 		  parts.Add "</office:spreadsheet></office:body>"
 		  parts.Add "</office:document-content>"
@@ -145,7 +145,7 @@ Protected Module ODSWriter
 		  Var anchors As New Dictionary
 		  For i As Integer = 0 To sheet.MergedRangeCount - 1
 		    Var rng As XLSXCellRange = sheet.MergedRangeAt(i)
-		    If rng <> Nil Then anchors.Value((rng.FirstRow * 16384) + rng.FirstCol) = rng
+		    If rng <> Nil Then anchors.Value((rng.FirstRowRaw * 16384) + rng.FirstColRaw) = rng
 		  Next
 
 		  Var cols As Integer = Max(1, sheet.ColCount)
@@ -153,7 +153,7 @@ Protected Module ODSWriter
 		  parts.Add "<table:table table:name=""" + XLSXHelpers.XmlEscape(sheet.Name) + """>"
 		  ' One <table:table-column> per column, referencing its width style.
 		  For c As Integer = 1 To cols
-		    Var wpt As Double = sheet.ColumnWidth(c)
+		    Var wpt As Double = sheet.ColumnWidthRaw(c)
 		    If wpt <= 0 Then wpt = 48.0
 		    parts.Add "<table:table-column table:style-name=""" + colStyles.Value(Str(wpt)).StringValue + """/>"
 		  Next
@@ -161,21 +161,21 @@ Protected Module ODSWriter
 		  For r As Integer = 1 To sheet.RowCount
 		    Var rowParts() As String
 		    Var rowStyleAttr As String = ""
-		    Var hpt As Double = sheet.RowHeight(r)
+		    Var hpt As Double = sheet.RowHeightRaw(r)
 		    If hpt > 0 And rowStyles.HasKey(Str(hpt)) Then rowStyleAttr = " table:style-name=""" + rowStyles.Value(Str(hpt)).StringValue + """"
 		    rowParts.Add "<table:table-row" + rowStyleAttr + ">"
 		    For c As Integer = 1 To cols
-		      If sheet.IsCellMergedFollower(r, c) Then
+		      If sheet.IsCellMergedFollowerRaw(r, c) Then
 		        rowParts.Add "<table:covered-table-cell/>"
 		        Continue
 		      End If
-		      Var cell As XLSXCell = sheet.CellAt(r, c)
+		      Var cell As XLSXCell = sheet.CellAtRaw(r, c)
 		      Var attrs As String = ""
 		      Var key As Integer = (r * 16384) + c
 		      If anchors.HasKey(key) Then
 		        Var rng As XLSXCellRange = anchors.Value(key)
-		        attrs = attrs + " table:number-columns-spanned=""" + Str(rng.LastCol - rng.FirstCol + 1) _
-		          + """ table:number-rows-spanned=""" + Str(rng.LastRow - rng.FirstRow + 1) + """"
+		        attrs = attrs + " table:number-columns-spanned=""" + Str(rng.LastColRaw - rng.FirstColRaw + 1) _
+		          + """ table:number-rows-spanned=""" + Str(rng.LastRowRaw - rng.FirstRowRaw + 1) + """"
 		      End If
 		      If cell.IsEmpty Then
 		        rowParts.Add "<table:table-cell" + attrs + "/>"
